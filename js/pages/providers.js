@@ -115,51 +115,76 @@ const ProvidersPage = (() => {
     });
   }
 
-  async function openEditor(provider) {
-    const isNew = !provider;
-    const idx = await Components.modal(isNew ? 'Add Provider' : 'Edit Provider', `
-      <div class="form-group">
-        <label>Name *</label>
-        <input id="prov-name" type="text" placeholder="My Provider" value="${Components.escHtml(provider?.name || '')}">
-      </div>
-      <div class="form-group">
-        <label>Base URL *</label>
-        <input id="prov-url" type="text" placeholder="https://api.example.com/v1" value="${Components.escHtml(provider?.baseUrl || '')}">
-      </div>
-      <div class="form-group">
-        <label>API Key</label>
-        <input id="prov-key" type="password" placeholder="sk-..." value="${Components.escHtml(provider?.apiKey || '')}">
-      </div>
-      <div class="form-group">
-        <label>Default Model</label>
-        <input id="prov-model" type="text" placeholder="llama-4-scout" value="${Components.escHtml(provider?.defaultModel || '')}">
-      </div>
-    `, [
-      { label: 'Cancel', cls: 'btn-secondary' },
-      { label: isNew ? 'Add' : 'Save', cls: 'btn-primary' },
-    ]);
+  function openEditor(provider) {
+    return new Promise(resolve => {
+      const isNew = !provider;
 
-    if (idx !== 1) return;
+      const overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
 
-    const name = document.getElementById('prov-name')?.value?.trim();
-    const baseUrl = document.getElementById('prov-url')?.value?.trim();
-    if (!name || !baseUrl) { Components.toast('Name and URL are required', 'error'); return; }
+      const modal = document.createElement('div');
+      modal.className = 'modal';
+      modal.innerHTML = `
+        <h2>${isNew ? 'Add Provider' : 'Edit Provider'}</h2>
+        <div class="form-group">
+          <label>Name *</label>
+          <input id="prov-name" type="text" placeholder="My Provider" value="${Components.escHtml(provider?.name || '')}">
+        </div>
+        <div class="form-group">
+          <label>Base URL *</label>
+          <input id="prov-url" type="text" placeholder="https://api.example.com/v1" value="${Components.escHtml(provider?.baseUrl || '')}">
+        </div>
+        <div class="form-group">
+          <label>API Key</label>
+          <input id="prov-key" type="password" placeholder="sk-..." value="${Components.escHtml(provider?.apiKey || '')}">
+        </div>
+        <div class="form-group">
+          <label>Default Model</label>
+          <input id="prov-model" type="text" placeholder="llama-4-scout" value="${Components.escHtml(provider?.defaultModel || '')}">
+        </div>
+        <div id="prov-error" style="color:var(--red);font-size:13px;min-height:18px;margin-top:4px"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+          <button class="btn btn-secondary" id="prov-cancel">Cancel</button>
+          <button class="btn btn-primary" id="prov-save">${isNew ? 'Add' : 'Save'}</button>
+        </div>`;
 
-    const updated = {
-      id: provider?.id || Store.newId(),
-      name,
-      baseUrl: baseUrl.replace(/\/$/, ''),
-      apiKey: document.getElementById('prov-key')?.value?.trim() || '',
-      defaultModel: document.getElementById('prov-model')?.value?.trim() || 'llama-4-scout',
-      type: 'openai',
-      fetchedModels: provider?.fetchedModels || [],
-    };
+      overlay.appendChild(modal);
+      document.body.appendChild(overlay);
 
-    Store.upsertProvider(updated);
-    if (isNew) Store.setActiveProviderId(updated.id);
-    renderList();
-    updateBadge();
-    Components.toast(isNew ? 'Provider added' : 'Provider saved', 'success');
+      function close() { overlay.remove(); resolve(); }
+
+      modal.querySelector('#prov-cancel').addEventListener('click', close);
+      overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+
+      modal.querySelector('#prov-save').addEventListener('click', () => {
+        const name = modal.querySelector('#prov-name').value.trim();
+        const baseUrl = modal.querySelector('#prov-url').value.trim();
+        const errEl = modal.querySelector('#prov-error');
+        if (!name || !baseUrl) {
+          errEl.textContent = 'Name and URL are required.';
+          return;
+        }
+
+        const updated = {
+          id: provider?.id || Store.newId(),
+          name,
+          baseUrl: baseUrl.replace(/\/$/, ''),
+          apiKey: modal.querySelector('#prov-key').value.trim(),
+          defaultModel: modal.querySelector('#prov-model').value.trim() || 'llama-4-scout',
+          type: 'openai',
+          fetchedModels: provider?.fetchedModels || [],
+        };
+
+        Store.upsertProvider(updated);
+        if (isNew) Store.setActiveProviderId(updated.id);
+        renderList();
+        updateBadge();
+        Components.toast(isNew ? 'Provider added' : 'Provider saved', 'success');
+        close();
+      });
+
+      modal.querySelector('#prov-name').focus();
+    });
   }
 
   function buildSettingsSection() {
