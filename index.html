@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LLMPlayground</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0f0f0f;
+      --bg2: #1a1a1a;
+      --bg3: #242424;
+      --border: #333;
+      --text: #e0e0e0;
+      --text2: #999;
+      --accent: #7c6af7;
+      --accent2: #5b4fcf;
+      --green: #4caf50;
+      --red: #f44336;
+      --yellow: #ff9800;
+      --code-bg: #141414;
+    }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+    #nav { background: var(--bg2); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 16px; height: 48px; gap: 4px; flex-shrink: 0; }
+    #nav .logo { font-weight: 700; font-size: 16px; color: var(--accent); margin-right: 16px; text-decoration: none; white-space: nowrap; }
+    #nav a { color: var(--text2); text-decoration: none; padding: 6px 12px; border-radius: 6px; font-size: 13px; transition: background 0.15s, color 0.15s; white-space: nowrap; }
+    #nav a:hover { background: var(--bg3); color: var(--text); }
+    #nav a.active { background: var(--bg3); color: var(--accent); }
+    #nav .spacer { flex: 1; }
+    #nav .provider-badge { font-size: 11px; color: var(--text2); background: var(--bg3); border: 1px solid var(--border); border-radius: 4px; padding: 3px 8px; cursor: pointer; }
+    #nav .provider-badge:hover { border-color: var(--accent); color: var(--accent); }
+    #app { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+    #app-content { flex: 1; overflow: hidden; }
+    .page { display: none; height: 100%; overflow: hidden; }
+    .page.active { display: flex; flex-direction: column; }
+    .toast-container { position: fixed; bottom: 20px; right: 20px; display: flex; flex-direction: column; gap: 8px; z-index: 9999; }
+    .toast { background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; padding: 10px 16px; font-size: 13px; max-width: 320px; animation: slideIn 0.2s ease; }
+    .toast.success { border-color: var(--green); color: var(--green); }
+    .toast.error { border-color: var(--red); color: var(--red); }
+    .toast.info { border-color: var(--accent); color: var(--accent); }
+    @keyframes slideIn { from { transform: translateX(40px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    button { cursor: pointer; border: none; border-radius: 6px; font-size: 13px; font-family: inherit; transition: background 0.15s; }
+    input, textarea, select { background: var(--bg3); border: 1px solid var(--border); color: var(--text); border-radius: 6px; font-size: 13px; font-family: inherit; outline: none; transition: border-color 0.15s; }
+    input:focus, textarea:focus, select:focus { border-color: var(--accent); }
+    input::placeholder, textarea::placeholder { color: var(--text2); }
+    select option { background: var(--bg3); }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #555; }
+    .btn { padding: 7px 14px; font-size: 13px; border-radius: 6px; border: none; cursor: pointer; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: var(--accent2); }
+    .btn-secondary { background: var(--bg3); color: var(--text); border: 1px solid var(--border); }
+    .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+    .btn-danger { background: transparent; color: var(--red); border: 1px solid var(--red); }
+    .btn-danger:hover { background: var(--red); color: #fff; }
+    .btn-sm { padding: 4px 10px; font-size: 12px; }
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+    .modal { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 24px; min-width: 360px; max-width: 560px; width: 90%; max-height: 80vh; overflow-y: auto; }
+    .modal h2 { font-size: 16px; margin-bottom: 16px; }
+    .form-group { margin-bottom: 14px; }
+    .form-group label { display: block; font-size: 12px; color: var(--text2); margin-bottom: 5px; }
+    .form-group input, .form-group textarea, .form-group select { width: 100%; padding: 8px 10px; }
+    .form-group textarea { resize: vertical; min-height: 80px; }
+  </style>
+</head>
+<body>
+  <nav id="nav">
+    <a href="#/" class="logo">LLMPlayground</a>
+    <a href="#/chat" data-route="/chat">Chat</a>
+    <a href="#/roleplay" data-route="/roleplay">Roleplay</a>
+    <a href="#/coding" data-route="/coding">Coding</a>
+    <a href="#/personas" data-route="/personas">Personas</a>
+    <a href="#/providers" data-route="/providers">Providers</a>
+    <div class="spacer"></div>
+    <span class="provider-badge" id="active-provider-badge" onclick="window.location.hash='#/providers'">Loading...</span>
+  </nav>
+  <div id="app">
+    <div id="app-content">
+      <div class="page" id="page-home"></div>
+      <div class="page" id="page-chat"></div>
+      <div class="page" id="page-roleplay"></div>
+      <div class="page" id="page-coding"></div>
+      <div class="page" id="page-personas"></div>
+      <div class="page" id="page-providers"></div>
+    </div>
+  </div>
+  <div class="toast-container" id="toasts"></div>
+
+  <script src="js/store.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/components.js"></script>
+  <script src="js/pages/chat.js"></script>
+  <script src="js/pages/roleplay.js"></script>
+  <script src="js/pages/coding.js"></script>
+  <script src="js/pages/personas.js"></script>
+  <script src="js/pages/providers.js"></script>
+  <script src="js/router.js"></script>
+</body>
+</html>
