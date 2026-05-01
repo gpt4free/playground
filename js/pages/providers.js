@@ -223,5 +223,5 @@ const ProvidersPage = (() => {
     badge.textContent = p ? `${p.name} · ${p.defaultModel || '?'}` : 'No provider';
   }
 
-  return { render, updateBadge };
+  return { render, updateBadge, renderList };
 })();

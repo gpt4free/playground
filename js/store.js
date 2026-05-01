@@ -7,10 +7,35 @@ const Store = (() => {
     settings: 'llmp_settings',
   };
 
+  const url = 'https://g4f.dev/dist/js/providers.json';
+  fetch(url).then(res => res.json()).then(data => {
+    if (!localStorage.getItem(KEYS['providers'])) {
+      for ([key, provider] of Object.entries(data.providers)) {
+        provider.id = key;
+        provider.name = (provider.label || key) + (provider.tags ? ` ${provider.tags}` : '');
+        provider.baseUrl = provider.backupUrl || provider.baseUrl || `https://g4f.space/api/${key}`;
+        provider.baseUrl = provider.baseUrl.replace('{model}', 'auto')
+        provider.type = provider.type || 'openai';
+        provider.models = provider.models || [];
+        provider.fetchedModels = [];
+        provider.defaultModel = data.defaultModels[key] || provider.defaultModel;
+        if (key === 'api.airforce') {
+          provider.defaultModel = 'llama-4-scout';
+        }
+        if (data.providerLocalStorage[key]) {
+          provider.apiKey = localStorage.getItem(data.providerLocalStorage[key]);
+        }
+      }
+      delete data.providers.custom;
+      Store.setProviders(Object.values(data.providers));
+      ProvidersPage.renderList();
+    }
+  });
+
   const defaults = {
     providers: [
       {
-        id: 'airforce',
+        id: 'api.airforce',
         name: 'Airforce API',
         baseUrl: 'https://api.airforce/v1',
         apiKey: '',
@@ -20,7 +45,7 @@ const Store = (() => {
         defaultModel: 'llama-4-scout',
       },
     ],
-    activeProvider: 'airforce',
+    activeProvider: 'api.airforce',
     personas: [],
     chats: [],
     settings: {
