@@ -24,7 +24,7 @@ const Store = (() => {
           provider.apiKey = localStorage.getItem(data.providerLocalStorage[key]);
         }
         if (!provider.apiKey && provider.backupUrl) {
-          provider.apiKey = appStorage.getItem("session_token");
+          provider.apiKey = localStorage.getItem("session_token");
         }
       }
       delete data.providers.custom;
