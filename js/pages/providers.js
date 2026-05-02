@@ -9,6 +9,11 @@ const ProvidersPage = (() => {
     const header = document.createElement('div');
     header.style.cssText = 'display:flex;align-items:center;gap:12px;margin-bottom:8px;';
     header.innerHTML = `<h1 style="font-size:20px;flex:1">Providers</h1>`;
+    const resetBtn = document.createElement('button');
+    resetBtn.className = 'btn btn-primary';
+    resetBtn.textContent = 'Reset Providers';
+    resetBtn.addEventListener('click', () => Store.loadProviders());
+    header.appendChild(resetBtn);
     const newBtn = document.createElement('button');
     newBtn.className = 'btn btn-primary';
     newBtn.textContent = '+ Add Provider';
