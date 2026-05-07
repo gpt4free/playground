@@ -383,8 +383,8 @@ const API = (() => {
       messages,
       stream: true,
       temperature: options.temperature ?? 0.7,
-      max_tokens: options.maxTokens ?? 2048,
     };
+    if (options.maxTokens) body.max_tokens = options.maxTokens;
 
     if (options.tools) {
       body.tools = options.tools;
@@ -464,13 +464,13 @@ const API = (() => {
       model: model || provider.defaultModel || 'claude-sonnet-4-20250514',
       messages: nonSystemMsgs,
       stream: true,
-      max_tokens: options.maxTokens ?? 2048,
+      max_tokens: options.maxTokens || 16384,
       temperature: options.temperature ?? 0.7,
     };
 
     if (systemMsg) body.system = systemMsg.content;
 
-    const thinkingBudget = options.maxTokens ? Math.min(options.maxTokens * 2, 16000) : 8000;
+    const thinkingBudget = options.maxTokens ? Math.min(options.maxTokens * 2, 16000) : 16000;
     body.thinking = { type: 'enabled', budget_tokens: thinkingBudget };
     body.temperature = 1;
 
@@ -542,13 +542,15 @@ const API = (() => {
       parts: [{ text: m.content }],
     }));
 
+    const genConfig = {
+      temperature: options.temperature ?? 0.7,
+      thinkingConfig: { thinkingBudget: 8000 },
+    };
+    if (options.maxTokens) genConfig.maxOutputTokens = options.maxTokens;
+
     const body = {
       contents,
-      generationConfig: {
-        temperature: options.temperature ?? 0.7,
-        maxOutputTokens: options.maxTokens ?? 2048,
-        thinkingConfig: { thinkingBudget: 8000 },
-      },
+      generationConfig: genConfig,
     };
 
     if (systemMsg) {
@@ -690,8 +692,8 @@ const API = (() => {
       model: model || provider.defaultModel || 'llama-4-scout',
       messages,
       temperature: options.temperature ?? 0.7,
-      max_tokens: options.maxTokens ?? 2048,
     };
+    if (options.maxTokens) body.max_tokens = options.maxTokens;
 
     const res = await fetchWithRetry(`${provider.baseUrl}/chat/completions`, {
       method: 'POST',
