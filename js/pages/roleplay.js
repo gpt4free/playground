@@ -3,6 +3,7 @@ const RoleplayPage = (() => {
   let currentPersonaId = null;
   let currentModel = null;
   let isStreaming = false;
+  let abortController = null;
 
   function render(container) {
     Components.injectStyles();
@@ -220,7 +221,7 @@ const RoleplayPage = (() => {
         deletable: true,
       });
       el.querySelector('[data-action="delete"]')?.addEventListener('click', () => deleteMessage(msg.id));
-      el.querySelector('[data-action="copy"]')?.addEventListener('click', () => navigator.clipboard.writeText(msg.content));
+      el.querySelector('[data-action="copy"]')?.addEventListener('click', () => Components.copyMessageContent(msg));
       wrap.appendChild(el);
     });
     wrap.scrollTop = wrap.scrollHeight;
@@ -230,6 +231,10 @@ const RoleplayPage = (() => {
     if (isStreaming || !currentChatId) return;
     const chat = Store.getChat(currentChatId);
     if (!chat) return;
+
+    const provider = Store.getActiveProvider();
+    const settings = Store.getSettings();
+    const model = currentModel || provider.defaultModel;
 
     const persona = currentPersonaId ? Store.getPersonas().find(p => p.id === currentPersonaId) : null;
 
@@ -247,47 +252,102 @@ const RoleplayPage = (() => {
       if (emptyState) emptyState.remove();
       const userEl = Components.renderMessage(userMsg, { deletable: true });
       userEl.querySelector('[data-action="delete"]')?.addEventListener('click', () => deleteMessage(userMsg.id));
-      userEl.querySelector('[data-action="copy"]')?.addEventListener('click', () => navigator.clipboard.writeText(userMsg.content));
+      userEl.querySelector('[data-action="copy"]')?.addEventListener('click', () => Components.copyMessageContent(userMsg));
       wrap.appendChild(userEl);
       wrap.scrollTop = wrap.scrollHeight;
     }
 
     const inputBar = document.getElementById('rp-input-bar');
-    inputBar?.setDisabled(true);
+    abortController = new AbortController();
     isStreaming = true;
+    inputBar?.setStreaming(true, () => { abortController?.abort(); });
 
-    const provider = Store.getActiveProvider();
-    const settings = Store.getSettings();
-    const model = currentModel || provider.defaultModel;
-
-    const assistantMsg = { id: Store.newId(), role: 'assistant', content: '', ts: Date.now() };
+    const assistantMsg = { id: Store.newId(), role: 'assistant', content: '', thinking: '', images: [], ts: Date.now() };
     const assistantEl = Components.renderMessage(assistantMsg, {
       personaName: persona?.name || 'Assistant',
       personaEmoji: persona?.emoji || '🤖',
     });
     const contentEl = assistantEl.querySelector('.msg-content');
+    Components.addTypingIndicator(assistantEl);
     if (wrap) { wrap.appendChild(assistantEl); wrap.scrollTop = wrap.scrollHeight; }
+
+    let typingRemoved = false;
 
     try {
       let fullContent = '';
+      let fullThinking = '';
+      const images = [];
       for await (const chunk of API.streamChat(provider, chat.messages, model, {
         temperature: settings.temperature,
         maxTokens: settings.maxTokens,
+        signal: abortController.signal,
       })) {
+        if (chunk.type === 'thinking') {
+          fullThinking += chunk.content;
+          Components.updateThinkingBlock(assistantEl, fullThinking);
+          if (!assistantEl.querySelector('.thinking-streaming')) {
+            const tb = assistantEl.querySelector('.thinking-block');
+            if (tb) tb.classList.add('thinking-streaming');
+          }
+          if (wrap) wrap.scrollTop = wrap.scrollHeight;
+        }
         if (chunk.type === 'text') {
+          if (!typingRemoved) {
+            Components.removeTypingIndicator(assistantEl);
+            typingRemoved = true;
+          }
           fullContent += chunk.content;
           contentEl.innerHTML = Components.renderMarkdown(fullContent);
           if (wrap) wrap.scrollTop = wrap.scrollHeight;
         }
+        if (chunk.type === 'image') {
+          if (!typingRemoved) {
+            Components.removeTypingIndicator(assistantEl);
+            typingRemoved = true;
+          }
+          images.push({ url: chunk.url, b64: chunk.b64, revisedPrompt: chunk.revisedPrompt });
+          const src = chunk.url || (chunk.b64 ? `data:image/png;base64,${chunk.b64}` : '');
+          if (src) {
+            let imagesContainer = assistantEl.querySelector('.msg-images');
+            if (!imagesContainer) {
+              imagesContainer = document.createElement('div');
+              imagesContainer.className = 'msg-images';
+              assistantEl.appendChild(imagesContainer);
+            }
+            const imgWrap = Components.createImageWithLoader(src, 'Generated image', chunk.revisedPrompt);
+            imagesContainer.appendChild(imgWrap);
+            if (wrap) wrap.scrollTop = wrap.scrollHeight;
+          }
+        }
       }
+
+      const extracted = API.extractThinkingFromText(fullContent);
+      if (extracted.thinking && !fullThinking) {
+        fullThinking = extracted.thinking;
+        fullContent = extracted.content;
+        Components.updateThinkingBlock(assistantEl, fullThinking);
+        contentEl.innerHTML = Components.renderMarkdown(fullContent);
+      }
+
       assistantMsg.content = fullContent;
+      assistantMsg.thinking = fullThinking;
+      assistantMsg.images = images;
     } catch (err) {
-      assistantMsg.content = `Error: ${err.message}`;
-      contentEl.innerHTML = Components.renderMarkdown(assistantMsg.content);
-      Components.toast(err.message, 'error');
+      if (err.name !== 'AbortError') {
+        assistantMsg.content = `Error: ${err.message}`;
+        contentEl.innerHTML = Components.renderMarkdown(assistantMsg.content);
+        Components.toast(err.message, 'error');
+      }
     }
 
-    assistantEl.querySelector('[data-action="copy"]')?.addEventListener('click', () => navigator.clipboard.writeText(assistantMsg.content));
+    if (!typingRemoved) {
+      Components.removeTypingIndicator(assistantEl);
+    }
+
+    const streamingBlock = assistantEl.querySelector('.thinking-streaming');
+    if (streamingBlock) streamingBlock.classList.remove('thinking-streaming');
+
+    assistantEl.querySelector('[data-action="copy"]')?.addEventListener('click', () => Components.copyMessageContent(assistantMsg));
 
     chat.messages.push(assistantMsg);
     if (chat.title === 'New Session' && chat.messages.filter(m => m.role !== 'system').length === 2) {
@@ -299,7 +359,8 @@ const RoleplayPage = (() => {
     refreshSidebar();
 
     isStreaming = false;
-    inputBar?.setDisabled(false);
+    abortController = null;
+    inputBar?.setStreaming(false);
   }
 
   function deleteMessage(msgId) {

@@ -25,7 +25,7 @@ const ProvidersPage = (() => {
 
     const hint = document.createElement('p');
     hint.style.cssText = 'color:var(--text2);font-size:13px;margin-bottom:20px;line-height:1.5;';
-    hint.textContent = 'Providers are OpenAI-compatible API endpoints. Airforce API is the default (no key required for free models).';
+    hint.textContent = 'Add any provider — OpenAI, Anthropic, Google, or compatible APIs. The endpoint type is auto-detected.';
 
     const list = document.createElement('div');
     list.id = 'providers-list';
@@ -43,6 +43,26 @@ const ProvidersPage = (() => {
     updateBadge();
   }
 
+  function endpointLabel(type) {
+    const labels = {
+      openai: 'OpenAI',
+      anthropic: 'Anthropic',
+      responses: 'Responses API',
+      google: 'Google AI',
+    };
+    return labels[type] || type || 'OpenAI';
+  }
+
+  function endpointColor(type) {
+    const colors = {
+      openai: '#4caf50',
+      anthropic: '#d4a574',
+      responses: '#2196f3',
+      google: '#ff9800',
+    };
+    return colors[type] || 'var(--text2)';
+  }
+
   function renderList() {
     const list = document.getElementById('providers-list');
     if (!list) return;
@@ -52,6 +72,7 @@ const ProvidersPage = (() => {
 
     providers.forEach(provider => {
       const isActive = provider.id === activeId;
+      const epType = provider.endpointType || provider.type || 'openai';
       const card = document.createElement('div');
       card.style.cssText = `background:var(--bg2);border:1px solid ${isActive ? 'var(--accent)' : 'var(--border)'};border-radius:12px;padding:16px;`;
       card.innerHTML = `
@@ -60,6 +81,7 @@ const ProvidersPage = (() => {
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
               <span style="font-weight:600;font-size:15px">${Components.escHtml(provider.name)}</span>
               ${isActive ? '<span style="font-size:11px;background:var(--accent);color:#fff;padding:2px 7px;border-radius:10px">Active</span>' : ''}
+              <span style="font-size:11px;background:${endpointColor(epType)};color:#fff;padding:2px 7px;border-radius:10px">${endpointLabel(epType)}</span>
             </div>
             <div style="font-size:12px;color:var(--text2);margin-top:4px;word-break:break-all">${Components.escHtml(provider.baseUrl)}</div>
           </div>
@@ -67,6 +89,7 @@ const ProvidersPage = (() => {
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
           ${!isActive ? `<button class="btn btn-secondary btn-sm" data-action="activate">Set Active</button>` : ''}
           <button class="btn btn-secondary btn-sm" data-action="fetch-models">Fetch Models</button>
+          <button class="btn btn-secondary btn-sm" data-action="redetect">Re-detect</button>
           <button class="btn btn-secondary btn-sm" data-action="edit">Edit</button>
           ${provider.id !== 'airforce' ? `<button class="btn btn-danger btn-sm" data-action="delete">Delete</button>` : ''}
         </div>
@@ -100,6 +123,19 @@ const ProvidersPage = (() => {
           Components.toast(`Fetched ${models.length} models`, 'success');
         } catch (err) {
           Components.toast(`Failed: ${err.message}`, 'error');
+        }
+      });
+
+      card.querySelector('[data-action="redetect"]')?.addEventListener('click', async () => {
+        try {
+          Components.toast('Detecting endpoint type...', 'info');
+          const detected = await API.detectEndpointType(provider.baseUrl, provider.apiKey);
+          provider.endpointType = detected;
+          Store.upsertProvider(provider);
+          renderList();
+          Components.toast(`Detected: ${endpointLabel(detected)}`, 'success');
+        } catch (err) {
+          Components.toast(`Detection failed: ${err.message}`, 'error');
         }
       });
 
@@ -148,8 +184,9 @@ const ProvidersPage = (() => {
         </div>
         <div class="form-group">
           <label>Default Model</label>
-          <input id="prov-model" type="text" placeholder="llama-4-scout" value="${Components.escHtml(provider?.defaultModel || '')}">
+          <input id="prov-model" type="text" placeholder="auto-detected or manual" value="${Components.escHtml(provider?.defaultModel || '')}">
         </div>
+        <div id="prov-status" style="font-size:13px;color:var(--text2);min-height:20px;margin-top:4px;display:flex;align-items:center;gap:8px"></div>
         <div id="prov-error" style="color:var(--red);font-size:13px;min-height:18px;margin-top:4px"></div>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
           <button class="btn btn-secondary" id="prov-cancel">Cancel</button>
@@ -164,30 +201,62 @@ const ProvidersPage = (() => {
       modal.querySelector('#prov-cancel').addEventListener('click', close);
       overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
 
-      modal.querySelector('#prov-save').addEventListener('click', () => {
+      modal.querySelector('#prov-save').addEventListener('click', async () => {
         const name = modal.querySelector('#prov-name').value.trim();
-        const baseUrl = modal.querySelector('#prov-url').value.trim();
+        const baseUrl = modal.querySelector('#prov-url').value.trim().replace(/\/$/, '');
+        const apiKey = modal.querySelector('#prov-key').value.trim();
         const errEl = modal.querySelector('#prov-error');
+        const statusEl = modal.querySelector('#prov-status');
         if (!name || !baseUrl) {
           errEl.textContent = 'Name and URL are required.';
           return;
+        }
+        errEl.textContent = '';
+
+        const saveBtn = modal.querySelector('#prov-save');
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Detecting...';
+
+        let detectedType = provider?.endpointType || 'openai';
+
+        if (isNew || baseUrl !== provider?.baseUrl || apiKey !== provider?.apiKey) {
+          statusEl.innerHTML = '<span style="animation:thinkPulse 1s infinite;color:var(--accent)">⟳</span> Probing endpoint type...';
+          try {
+            detectedType = await API.detectEndpointType(baseUrl, apiKey);
+            statusEl.innerHTML = `<span style="color:${endpointColor(detectedType)}">●</span> Detected: <strong style="color:var(--text)">${endpointLabel(detectedType)}</strong>`;
+          } catch {
+            statusEl.innerHTML = '<span style="color:var(--yellow)">⚠</span> Detection failed, defaulting to OpenAI';
+            detectedType = 'openai';
+          }
         }
 
         const updated = {
           id: provider?.id || Store.newId(),
           name,
-          baseUrl: baseUrl.replace(/\/$/, ''),
-          apiKey: modal.querySelector('#prov-key').value.trim(),
-          defaultModel: modal.querySelector('#prov-model').value.trim() || 'llama-4-scout',
-          type: 'openai',
+          baseUrl,
+          apiKey,
+          defaultModel: modal.querySelector('#prov-model').value.trim() || provider?.defaultModel || '',
+          type: detectedType,
+          endpointType: detectedType,
           fetchedModels: provider?.fetchedModels || [],
         };
 
         Store.upsertProvider(updated);
         if (isNew) Store.setActiveProviderId(updated.id);
+
+        saveBtn.textContent = 'Fetching models...';
+        try {
+          const models = await API.fetchModels(updated);
+          if (models.length > 0) {
+            updated.fetchedModels = models;
+            if (!updated.defaultModel) updated.defaultModel = models[0];
+            Store.upsertProvider(updated);
+          }
+        } catch {}
+
         renderList();
         updateBadge();
-        Components.toast(isNew ? 'Provider added' : 'Provider saved', 'success');
+        Components.toast(isNew ? `Provider added (${endpointLabel(detectedType)})` : 'Provider saved', 'success');
         close();
       });
 
