@@ -4,24 +4,27 @@ const ProvidersPage = (() => {
     container.innerHTML = '';
 
     const wrap = document.createElement('div');
-    wrap.style.cssText = 'padding:24px;overflow-y:auto;height:100%;max-width:800px;margin:0 auto;';
+    wrap.style.cssText = 'padding:16px;overflow-y:auto;-webkit-overflow-scrolling:touch;height:100%;max-width:800px;margin:0 auto;';
 
     const header = document.createElement('div');
-    header.style.cssText = 'display:flex;align-items:center;gap:12px;margin-bottom:8px;';
-    header.innerHTML = `<h1 style="font-size:20px;flex:1">Providers</h1>`;
+    header.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;';
+    header.innerHTML = `<h1 style="font-size:18px;flex:1;min-width:120px">Providers</h1>`;
+    const btnWrap = document.createElement('div');
+    btnWrap.style.cssText = 'display:flex;gap:8px;';
     const resetBtn = document.createElement('button');
-    resetBtn.className = 'btn btn-primary';
-    resetBtn.textContent = 'Reset Providers';
+    resetBtn.className = 'btn btn-secondary btn-sm';
+    resetBtn.textContent = 'Reset';
     resetBtn.addEventListener('click', () => Store.loadProviders());
-    header.appendChild(resetBtn);
+    btnWrap.appendChild(resetBtn);
     const newBtn = document.createElement('button');
-    newBtn.className = 'btn btn-primary';
-    newBtn.textContent = '+ Add Provider';
+    newBtn.className = 'btn btn-primary btn-sm';
+    newBtn.textContent = '+ Add';
     newBtn.addEventListener('click', () => openEditor(null));
-    header.appendChild(newBtn);
+    btnWrap.appendChild(newBtn);
+    header.appendChild(btnWrap);
 
     const hint = document.createElement('p');
-    hint.style.cssText = 'color:var(--text2);font-size:13px;margin-bottom:24px;';
+    hint.style.cssText = 'color:var(--text2);font-size:13px;margin-bottom:20px;line-height:1.5;';
     hint.textContent = 'Providers are OpenAI-compatible API endpoints. Airforce API is the default (no key required for free models).';
 
     const list = document.createElement('div');
@@ -50,30 +53,30 @@ const ProvidersPage = (() => {
     providers.forEach(provider => {
       const isActive = provider.id === activeId;
       const card = document.createElement('div');
-      card.style.cssText = `background:var(--bg2);border:1px solid ${isActive ? 'var(--accent)' : 'var(--border)'};border-radius:10px;padding:16px;`;
+      card.style.cssText = `background:var(--bg2);border:1px solid ${isActive ? 'var(--accent)' : 'var(--border)'};border-radius:12px;padding:16px;`;
       card.innerHTML = `
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
-          <div style="flex:1">
-            <div style="display:flex;align-items:center;gap:8px">
+        <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
               <span style="font-weight:600;font-size:15px">${Components.escHtml(provider.name)}</span>
               ${isActive ? '<span style="font-size:11px;background:var(--accent);color:#fff;padding:2px 7px;border-radius:10px">Active</span>' : ''}
             </div>
-            <div style="font-size:12px;color:var(--text2);margin-top:2px">${Components.escHtml(provider.baseUrl)}</div>
-          </div>
-          <div style="display:flex;gap:8px;flex-shrink:0">
-            ${!isActive ? `<button class="btn btn-secondary btn-sm" data-action="activate">Set Active</button>` : ''}
-            <button class="btn btn-secondary btn-sm" data-action="fetch-models">Fetch Models</button>
-            <button class="btn btn-secondary btn-sm" data-action="edit">Edit</button>
-            ${provider.id !== 'airforce' ? `<button class="btn btn-danger btn-sm" data-action="delete">Delete</button>` : ''}
+            <div style="font-size:12px;color:var(--text2);margin-top:4px;word-break:break-all">${Components.escHtml(provider.baseUrl)}</div>
           </div>
         </div>
-        <div style="display:flex;gap:16px;font-size:12px;color:var(--text2)">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+          ${!isActive ? `<button class="btn btn-secondary btn-sm" data-action="activate">Set Active</button>` : ''}
+          <button class="btn btn-secondary btn-sm" data-action="fetch-models">Fetch Models</button>
+          <button class="btn btn-secondary btn-sm" data-action="edit">Edit</button>
+          ${provider.id !== 'airforce' ? `<button class="btn btn-danger btn-sm" data-action="delete">Delete</button>` : ''}
+        </div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--text2)">
           <span>Model: <strong style="color:var(--text)">${Components.escHtml(provider.defaultModel || '—')}</strong></span>
           <span>Key: <strong style="color:var(--text)">${provider.apiKey ? '••••' + provider.apiKey.slice(-4) : 'None'}</strong></span>
-          <span>Models cached: <strong style="color:var(--text)">${provider.fetchedModels?.length || 0}</strong></span>
+          <span>Cached: <strong style="color:var(--text)">${provider.fetchedModels?.length || 0}</strong></span>
         </div>
         ${provider.fetchedModels?.length ? `
-        <div style="margin-top:10px">
+        <div style="margin-top:12px">
           <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px">Default Model</label>
           <select class="model-select default-model-sel" style="width:100%">
             ${provider.fetchedModels.map(m => `<option value="${Components.escHtml(m)}" ${m === provider.defaultModel ? 'selected' : ''}>${Components.escHtml(m)}</option>`).join('')}
@@ -194,22 +197,22 @@ const ProvidersPage = (() => {
 
   function buildSettingsSection() {
     const section = document.createElement('div');
-    section.style.cssText = 'margin-top:32px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:20px;';
+    section.style.cssText = 'margin-top:24px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px;';
     const settings = Store.getSettings();
     section.innerHTML = `
       <h2 style="font-size:15px;margin-bottom:16px">Global Settings</h2>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+      <div style="display:grid;grid-template-columns:1fr;gap:14px;">
         <div class="form-group" style="margin:0">
           <label>Temperature (0–2)</label>
-          <input id="set-temp" type="number" min="0" max="2" step="0.1" value="${settings.temperature}" style="width:100%;padding:8px 10px;">
+          <input id="set-temp" type="number" min="0" max="2" step="0.1" value="${settings.temperature}" style="width:100%;padding:10px 12px;">
         </div>
         <div class="form-group" style="margin:0">
           <label>Max Tokens</label>
-          <input id="set-maxtok" type="number" min="64" max="32000" step="64" value="${settings.maxTokens}" style="width:100%;padding:8px 10px;">
+          <input id="set-maxtok" type="number" min="64" max="32000" step="64" value="${settings.maxTokens}" style="width:100%;padding:10px 12px;">
         </div>
       </div>
       <div style="margin-top:14px">
-        <button class="btn btn-primary btn-sm" id="save-settings-btn">Save Settings</button>
+        <button class="btn btn-primary" id="save-settings-btn" style="width:100%">Save Settings</button>
       </div>`;
     section.querySelector('#save-settings-btn').addEventListener('click', () => {
       Store.updateSettings({

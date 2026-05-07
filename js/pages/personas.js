@@ -9,10 +9,10 @@ const PersonasPage = (() => {
     wrap.style.cssText = 'display:flex;flex-direction:column;height:100%;overflow:hidden;';
 
     const header = document.createElement('div');
-    header.style.cssText = 'padding:20px 24px 0;flex-shrink:0;';
+    header.style.cssText = 'padding:16px 16px 0;flex-shrink:0;';
     header.innerHTML = `
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
-        <h1 style="font-size:20px;flex:1">Personas</h1>
+        <h1 style="font-size:18px;flex:1">Personas</h1>
         <button class="btn btn-primary" id="new-persona-btn">+ New Persona</button>
       </div>`;
 
@@ -20,7 +20,7 @@ const PersonasPage = (() => {
 
     const content = document.createElement('div');
     content.id = 'personas-content';
-    content.style.cssText = 'flex:1;overflow-y:auto;padding:20px 24px;';
+    content.style.cssText = 'flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px;';
 
     wrap.appendChild(header);
     wrap.appendChild(content);
@@ -34,7 +34,7 @@ const PersonasPage = (() => {
     content.innerHTML = '';
 
     if (personas.length === 0) {
-      content.innerHTML = `<div style="text-align:center;padding:48px;color:var(--text2)">
+      content.innerHTML = `<div style="text-align:center;padding:48px 16px;color:var(--text2)">
         <div style="font-size:48px;margin-bottom:12px">🎭</div>
         <h2 style="color:var(--text);margin-bottom:8px">No personas yet</h2>
         <p>Create a persona to use in roleplay chats</p>
@@ -43,7 +43,7 @@ const PersonasPage = (() => {
     }
 
     const grid = document.createElement('div');
-    grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;';
+    grid.style.cssText = 'display:grid;grid-template-columns:1fr;gap:12px;';
     personas.forEach(persona => grid.appendChild(buildCard(persona)));
     content.appendChild(grid);
   }
@@ -52,15 +52,15 @@ const PersonasPage = (() => {
     const card = document.createElement('div');
     card.className = 'persona-card';
     card.innerHTML = `
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
         <span style="font-size:32px">${persona.emoji || '🎭'}</span>
         <div style="flex:1;min-width:0">
           <div style="font-weight:600;font-size:15px">${Components.escHtml(persona.name)}</div>
-          ${persona.tags?.length ? `<div style="font-size:11px;color:var(--text2)">${Components.escHtml(persona.tags.slice(0, 3).join(', '))}</div>` : ''}
+          ${persona.tags?.length ? `<div style="font-size:12px;color:var(--text2)">${Components.escHtml(persona.tags.slice(0, 3).join(', '))}</div>` : ''}
         </div>
       </div>
-      <p style="font-size:13px;color:var(--text2);line-height:1.5;flex:1;margin-bottom:10px">${Components.escHtml((persona.description || '').slice(0, 100))}${(persona.description || '').length > 100 ? '…' : ''}</p>
-      <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <p style="font-size:13px;color:var(--text2);line-height:1.5;flex:1;margin-bottom:12px">${Components.escHtml((persona.description || '').slice(0, 100))}${(persona.description || '').length > 100 ? '…' : ''}</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-secondary btn-sm" data-action="edit">Edit</button>
         <button class="btn btn-secondary btn-sm" data-action="use">Use in Roleplay</button>
         <button class="btn btn-danger btn-sm" data-action="delete" style="margin-left:auto">✕</button>
@@ -88,14 +88,13 @@ const PersonasPage = (() => {
 
       const modal = document.createElement('div');
       modal.className = 'modal';
-      modal.style.maxWidth = '540px';
       modal.innerHTML = `
         <h2>${isNew ? 'New Persona' : 'Edit Persona'}</h2>
         <div class="modal-body">
           <div style="display:flex;gap:12px">
             <div class="form-group" style="width:80px;flex-shrink:0">
               <label>Emoji</label>
-              <input id="pe-emoji" type="text" value="${Components.escHtml(persona?.emoji || '🎭')}" style="width:100%;padding:8px 10px;text-align:center;font-size:20px">
+              <input id="pe-emoji" type="text" value="${Components.escHtml(persona?.emoji || '🎭')}" style="width:100%;padding:10px;text-align:center;font-size:20px">
             </div>
             <div class="form-group" style="flex:1">
               <label>Name *</label>
@@ -181,8 +180,12 @@ const PersonasPage = (() => {
     const style = document.createElement('style');
     style.id = 'persona-css';
     style.textContent = `
-      .persona-card { background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:16px;display:flex;flex-direction:column;transition:border-color 0.15s; }
-      .persona-card:hover { border-color:var(--accent); }
+      .persona-card { background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px;display:flex;flex-direction:column;transition:border-color 0.15s; }
+      .persona-card:active { border-color:var(--accent); }
+      @media (min-width: 768px) {
+        #personas-content > div { grid-template-columns:repeat(auto-fill,minmax(260px,1fr)) !important; }
+        .persona-card:hover { border-color:var(--accent); }
+      }
     `;
     document.head.appendChild(style);
   }

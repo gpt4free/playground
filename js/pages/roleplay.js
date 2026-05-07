@@ -11,6 +11,12 @@ const RoleplayPage = (() => {
     const layout = document.createElement('div');
     layout.className = 'split-layout';
 
+    const backdrop = document.createElement('div');
+    backdrop.className = 'sidebar-backdrop';
+    backdrop.id = 'rp-sidebar-backdrop';
+    backdrop.addEventListener('click', closeSidebar);
+
+    layout.appendChild(backdrop);
     layout.appendChild(buildSidebar());
     layout.appendChild(buildMain());
     container.appendChild(layout);
@@ -18,6 +24,20 @@ const RoleplayPage = (() => {
     const chats = Store.getChats().filter(c => c.type === 'roleplay');
     if (chats.length > 0) loadChat(chats[0].id);
     else newChat();
+  }
+
+  function toggleSidebar() {
+    const sidebar = document.getElementById('rp-sidebar');
+    const backdrop = document.getElementById('rp-sidebar-backdrop');
+    sidebar?.classList.toggle('open');
+    backdrop?.classList.toggle('open');
+  }
+
+  function closeSidebar() {
+    const sidebar = document.getElementById('rp-sidebar');
+    const backdrop = document.getElementById('rp-sidebar-backdrop');
+    sidebar?.classList.remove('open');
+    backdrop?.classList.remove('open');
   }
 
   function buildSidebar() {
@@ -41,7 +61,7 @@ const RoleplayPage = (() => {
     list.innerHTML = '';
     const chats = Store.getChats().filter(c => c.type === 'roleplay');
     if (chats.length === 0) {
-      list.innerHTML = '<div style="padding:16px;color:var(--text2);font-size:12px">No roleplay sessions yet</div>';
+      list.innerHTML = '<div style="padding:16px;color:var(--text2);font-size:13px">No roleplay sessions yet</div>';
       return;
     }
     chats.forEach(chat => {
@@ -56,7 +76,7 @@ const RoleplayPage = (() => {
         <button class="item-del" title="Delete">✕</button>`;
       item.addEventListener('click', e => {
         if (e.target.classList.contains('item-del')) deleteChat(chat.id);
-        else loadChat(chat.id);
+        else { loadChat(chat.id); closeSidebar(); }
       });
       list.appendChild(item);
     });
@@ -70,6 +90,11 @@ const RoleplayPage = (() => {
     const toolbar = document.createElement('div');
     toolbar.className = 'chat-toolbar';
     toolbar.id = 'rp-toolbar';
+
+    const sidebarBtn = document.createElement('button');
+    sidebarBtn.className = 'sidebar-toggle';
+    sidebarBtn.innerHTML = '☰';
+    sidebarBtn.addEventListener('click', toggleSidebar);
 
     const titleInput = document.createElement('input');
     titleInput.className = 'title-input';
@@ -96,6 +121,7 @@ const RoleplayPage = (() => {
     clearBtn.textContent = 'Clear';
     clearBtn.addEventListener('click', clearMessages);
 
+    toolbar.appendChild(sidebarBtn);
     toolbar.appendChild(titleInput);
     toolbar.appendChild(personaSel);
     toolbar.appendChild(modelSel);

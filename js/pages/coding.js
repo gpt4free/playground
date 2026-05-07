@@ -18,6 +18,12 @@ const CodingPage = (() => {
     const layout = document.createElement('div');
     layout.className = 'split-layout';
 
+    const backdrop = document.createElement('div');
+    backdrop.className = 'sidebar-backdrop';
+    backdrop.id = 'code-sidebar-backdrop';
+    backdrop.addEventListener('click', closeSidebar);
+
+    layout.appendChild(backdrop);
     layout.appendChild(buildSidebar());
     layout.appendChild(buildMain());
     container.appendChild(layout);
@@ -25,6 +31,20 @@ const CodingPage = (() => {
     const chats = Store.getChats().filter(c => c.type === 'coding');
     if (chats.length > 0) loadChat(chats[0].id);
     else newChat();
+  }
+
+  function toggleSidebar() {
+    const sidebar = document.getElementById('code-sidebar');
+    const backdrop = document.getElementById('code-sidebar-backdrop');
+    sidebar?.classList.toggle('open');
+    backdrop?.classList.toggle('open');
+  }
+
+  function closeSidebar() {
+    const sidebar = document.getElementById('code-sidebar');
+    const backdrop = document.getElementById('code-sidebar-backdrop');
+    sidebar?.classList.remove('open');
+    backdrop?.classList.remove('open');
   }
 
   function buildSidebar() {
@@ -48,7 +68,7 @@ const CodingPage = (() => {
     list.innerHTML = '';
     const chats = Store.getChats().filter(c => c.type === 'coding');
     if (chats.length === 0) {
-      list.innerHTML = '<div style="padding:16px;color:var(--text2);font-size:12px">No coding sessions yet</div>';
+      list.innerHTML = '<div style="padding:16px;color:var(--text2);font-size:13px">No coding sessions yet</div>';
       return;
     }
     chats.forEach(chat => {
@@ -62,7 +82,7 @@ const CodingPage = (() => {
         <button class="item-del" title="Delete">✕</button>`;
       item.addEventListener('click', e => {
         if (e.target.classList.contains('item-del')) deleteChat(chat.id);
-        else loadChat(chat.id);
+        else { loadChat(chat.id); closeSidebar(); }
       });
       list.appendChild(item);
     });
@@ -77,6 +97,11 @@ const CodingPage = (() => {
     toolbar.className = 'chat-toolbar';
     toolbar.id = 'code-toolbar';
 
+    const sidebarBtn = document.createElement('button');
+    sidebarBtn.className = 'sidebar-toggle';
+    sidebarBtn.innerHTML = '☰';
+    sidebarBtn.addEventListener('click', toggleSidebar);
+
     const titleInput = document.createElement('input');
     titleInput.className = 'title-input';
     titleInput.placeholder = 'Session title...';
@@ -90,7 +115,7 @@ const CodingPage = (() => {
     modelSel.addEventListener('change', () => { currentModel = modelSel.value; });
 
     const quickBtns = document.createElement('div');
-    quickBtns.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;';
+    quickBtns.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;width:100%;order:10;';
     [
       ['Explain', 'Explain this code:'],
       ['Review', 'Review this code for bugs and improvements:'],
@@ -108,12 +133,13 @@ const CodingPage = (() => {
           input.focus();
           input.setSelectionRange(input.value.length, input.value.length);
           input.style.height = 'auto';
-          input.style.height = Math.min(input.scrollHeight, 200) + 'px';
+          input.style.height = Math.min(input.scrollHeight, 160) + 'px';
         }
       });
       quickBtns.appendChild(btn);
     });
 
+    toolbar.appendChild(sidebarBtn);
     toolbar.appendChild(titleInput);
     toolbar.appendChild(modelSel);
     toolbar.appendChild(quickBtns);
@@ -123,7 +149,7 @@ const CodingPage = (() => {
     messagesWrap.id = 'code-messages';
 
     const inputBar = Components.chatInputBar(sendMessage, {
-      placeholder: 'Ask a coding question or paste code... (Shift+Enter for newline)',
+      placeholder: 'Ask a coding question or paste code...',
     });
     inputBar.id = 'code-input-bar';
 
@@ -288,7 +314,6 @@ const CodingPage = (() => {
     const style = document.createElement('style');
     style.id = 'coding-css';
     style.textContent = `
-      #code-messages .msg-content pre { font-size: 13px; }
       #code-messages .code-block { border-left: 3px solid var(--accent); }
     `;
     document.head.appendChild(style);

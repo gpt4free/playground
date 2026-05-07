@@ -10,9 +10,15 @@ const ChatPage = (() => {
     const layout = document.createElement('div');
     layout.className = 'split-layout';
 
+    const backdrop = document.createElement('div');
+    backdrop.className = 'sidebar-backdrop';
+    backdrop.id = 'chat-sidebar-backdrop';
+    backdrop.addEventListener('click', closeSidebar);
+
     const sidebar = buildSidebar();
     const main = buildMain();
 
+    layout.appendChild(backdrop);
     layout.appendChild(sidebar);
     layout.appendChild(main);
     container.appendChild(layout);
@@ -20,6 +26,20 @@ const ChatPage = (() => {
     const chats = Store.getChats().filter(c => c.type === 'chat');
     if (chats.length > 0) loadChat(chats[0].id);
     else newChat();
+  }
+
+  function toggleSidebar() {
+    const sidebar = document.getElementById('chat-sidebar');
+    const backdrop = document.getElementById('chat-sidebar-backdrop');
+    sidebar?.classList.toggle('open');
+    backdrop?.classList.toggle('open');
+  }
+
+  function closeSidebar() {
+    const sidebar = document.getElementById('chat-sidebar');
+    const backdrop = document.getElementById('chat-sidebar-backdrop');
+    sidebar?.classList.remove('open');
+    backdrop?.classList.remove('open');
   }
 
   function buildSidebar() {
@@ -43,7 +63,7 @@ const ChatPage = (() => {
     list.innerHTML = '';
     const chats = Store.getChats().filter(c => c.type === 'chat');
     if (chats.length === 0) {
-      list.innerHTML = '<div style="padding:16px;color:var(--text2);font-size:12px">No chats yet</div>';
+      list.innerHTML = '<div style="padding:16px;color:var(--text2);font-size:13px">No chats yet</div>';
       return;
     }
     chats.forEach(chat => {
@@ -61,6 +81,7 @@ const ChatPage = (() => {
           deleteChat(chat.id);
         } else {
           loadChat(chat.id);
+          closeSidebar();
         }
       });
       list.appendChild(item);
@@ -75,6 +96,11 @@ const ChatPage = (() => {
     const toolbar = document.createElement('div');
     toolbar.className = 'chat-toolbar';
     toolbar.id = 'chat-toolbar';
+
+    const sidebarBtn = document.createElement('button');
+    sidebarBtn.className = 'sidebar-toggle';
+    sidebarBtn.innerHTML = '☰';
+    sidebarBtn.addEventListener('click', toggleSidebar);
 
     const titleInput = document.createElement('input');
     titleInput.className = 'title-input';
@@ -93,6 +119,7 @@ const ChatPage = (() => {
     clearBtn.textContent = 'Clear';
     clearBtn.addEventListener('click', clearMessages);
 
+    toolbar.appendChild(sidebarBtn);
     toolbar.appendChild(titleInput);
     toolbar.appendChild(modelSel);
     toolbar.appendChild(clearBtn);

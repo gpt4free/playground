@@ -118,13 +118,13 @@ const Components = (() => {
     const wrap = document.createElement('div');
     wrap.className = 'input-bar';
     wrap.innerHTML = `
-      <textarea class="chat-input" placeholder="${opts.placeholder || 'Type a message... (Shift+Enter for newline)'}" rows="1"></textarea>
+      <textarea class="chat-input" placeholder="${opts.placeholder || 'Type a message...'}" rows="1"></textarea>
       <button class="btn btn-primary send-btn">${opts.sendLabel || 'Send'}</button>`;
     const ta = wrap.querySelector('textarea');
     const btn = wrap.querySelector('button');
     ta.addEventListener('input', () => {
       ta.style.height = 'auto';
-      ta.style.height = Math.min(ta.scrollHeight, 200) + 'px';
+      ta.style.height = Math.min(ta.scrollHeight, 160) + 'px';
     });
     ta.addEventListener('keydown', e => {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
@@ -147,56 +147,129 @@ const Components = (() => {
     const style = document.createElement('style');
     style.id = 'components-css';
     style.textContent = `
-      .msg { padding: 12px 16px; border-bottom: 1px solid var(--border); }
+      .msg { padding: 14px 16px; border-bottom: 1px solid var(--border); }
       .msg:last-child { border-bottom: none; }
       .msg-user { background: var(--bg); }
       .msg-assistant { background: var(--bg2); }
       .msg-system { background: var(--bg3); opacity: 0.8; }
-      .msg-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-      .msg-avatar { font-size: 16px; }
-      .msg-name { font-weight: 600; font-size: 13px; }
+      .msg-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+      .msg-avatar { font-size: 18px; }
+      .msg-name { font-weight: 600; font-size: 14px; }
       .msg-time { font-size: 11px; color: var(--text2); margin-left: 4px; }
-      .msg-actions { margin-left: auto; display: flex; gap: 4px; opacity: 0; transition: opacity 0.15s; }
-      .msg:hover .msg-actions { opacity: 1; }
-      .msg-btn { background: none; border: none; color: var(--text2); cursor: pointer; padding: 2px 5px; border-radius: 4px; font-size: 13px; }
-      .msg-btn:hover { background: var(--bg3); color: var(--text); }
-      .msg-content { line-height: 1.6; word-break: break-word; }
+      .msg-actions { margin-left: auto; display: flex; gap: 2px; }
+      .msg-btn { background: none; border: none; color: var(--text2); cursor: pointer; padding: 6px 8px; border-radius: 6px; font-size: 15px; min-width: 36px; min-height: 36px; display: flex; align-items: center; justify-content: center; }
+      .msg-btn:active { background: var(--bg3); color: var(--text); }
+      .msg-content { line-height: 1.65; word-break: break-word; }
       .msg-content p { margin: 0 0 8px; }
       .msg-content p:last-child { margin-bottom: 0; }
       .msg-content h1,.msg-content h2,.msg-content h3 { margin: 8px 0 4px; }
       .msg-content ul { padding-left: 20px; margin: 4px 0; }
       .msg-content li { margin: 2px 0; }
-      .code-block { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin: 8px 0; overflow-x: auto; position: relative; }
+      .code-block { background: var(--code-bg); border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin: 8px 0; overflow-x: auto; position: relative; -webkit-overflow-scrolling: touch; }
       .code-lang { font-size: 11px; color: var(--text2); margin-bottom: 6px; text-transform: uppercase; }
       .code-block code { font-family: 'Cascadia Code','Fira Code',monospace; font-size: 13px; white-space: pre; }
-      .copy-code-btn { position: absolute; top: 8px; right: 8px; background: var(--bg3); border: 1px solid var(--border); color: var(--text2); padding: 3px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; }
-      .copy-code-btn:hover { color: var(--text); }
-      .inline-code { background: var(--code-bg); border: 1px solid var(--border); border-radius: 3px; padding: 1px 5px; font-family: monospace; font-size: 12px; }
-      .input-bar { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--border); background: var(--bg2); align-items: flex-end; }
-      .chat-input { flex: 1; padding: 9px 12px; resize: none; line-height: 1.5; max-height: 200px; overflow-y: auto; }
-      .send-btn { flex-shrink: 0; height: 38px; padding: 0 18px; }
-      .model-select { padding: 5px 8px; font-size: 12px; }
-      .chat-toolbar { display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-bottom: 1px solid var(--border); background: var(--bg2); flex-wrap: wrap; }
-      .chat-toolbar .title-input { background: none; border: none; font-size: 14px; font-weight: 600; color: var(--text); flex: 1; min-width: 120px; padding: 4px; }
-      .chat-toolbar .title-input:focus { background: var(--bg3); border-radius: 4px; }
-      .messages-wrap { flex: 1; overflow-y: auto; }
-      .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--text2); gap: 8px; }
+      .copy-code-btn { position: absolute; top: 8px; right: 8px; background: var(--bg3); border: 1px solid var(--border); color: var(--text2); padding: 4px 10px; border-radius: 6px; font-size: 12px; cursor: pointer; min-height: 32px; }
+      .copy-code-btn:active { color: var(--text); }
+      .inline-code { background: var(--code-bg); border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px; font-family: monospace; font-size: 13px; }
+      .input-bar { display: flex; gap: 8px; padding: 10px 12px; padding-bottom: calc(10px + var(--safe-bottom)); border-top: 1px solid var(--border); background: var(--bg2); align-items: flex-end; }
+      .chat-input { flex: 1; padding: 10px 12px; resize: none; line-height: 1.5; max-height: 160px; overflow-y: auto; font-size: 16px; border-radius: 10px; }
+      .send-btn { flex-shrink: 0; height: 44px; padding: 0 18px; border-radius: 10px; }
+      .model-select { padding: 8px 10px; font-size: 14px; border-radius: 8px; min-height: 40px; }
+      .chat-toolbar { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--border); background: var(--bg2); flex-wrap: wrap; }
+      .chat-toolbar .title-input { background: none; border: none; font-size: 15px; font-weight: 600; color: var(--text); flex: 1; min-width: 100px; padding: 6px; }
+      .chat-toolbar .title-input:focus { background: var(--bg3); border-radius: 6px; }
+      .messages-wrap { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+      .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--text2); gap: 8px; padding: 24px; text-align: center; }
       .empty-state .big { font-size: 48px; }
       .empty-state h2 { font-size: 18px; color: var(--text); }
-      .sidebar { width: 240px; border-right: 1px solid var(--border); background: var(--bg2); display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden; }
-      .sidebar-header { padding: 12px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
-      .sidebar-header h3 { flex: 1; font-size: 13px; }
-      .sidebar-list { flex: 1; overflow-y: auto; }
-      .sidebar-item { padding: 10px 12px; cursor: pointer; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
-      .sidebar-item:hover { background: var(--bg3); }
-      .sidebar-item.active { background: var(--bg3); border-left: 2px solid var(--accent); }
-      .sidebar-item .item-title { flex: 1; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      .sidebar-item .item-sub { font-size: 11px; color: var(--text2); }
-      .sidebar-item .item-del { opacity: 0; color: var(--text2); background: none; border: none; cursor: pointer; padding: 2px 5px; border-radius: 3px; }
-      .sidebar-item:hover .item-del { opacity: 1; }
-      .sidebar-item .item-del:hover { color: var(--red); }
-      .split-layout { display: flex; flex: 1; overflow: hidden; }
-      .split-main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+      .sidebar {
+        position: fixed;
+        top: var(--nav-height);
+        left: 0;
+        bottom: 0;
+        width: 85%;
+        max-width: 320px;
+        background: var(--bg2);
+        display: flex;
+        flex-direction: column;
+        z-index: 90;
+        transform: translateX(-100%);
+        transition: transform 0.25s ease;
+        border-right: 1px solid var(--border);
+      }
+      .sidebar.open { transform: translateX(0); }
+      .sidebar-backdrop {
+        display: none;
+        position: fixed;
+        inset: 0;
+        top: var(--nav-height);
+        background: rgba(0,0,0,0.5);
+        z-index: 89;
+      }
+      .sidebar-backdrop.open { display: block; }
+      .sidebar-header { padding: 14px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
+      .sidebar-header h3 { flex: 1; font-size: 15px; }
+      .sidebar-list { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+      .sidebar-item { padding: 14px 16px; cursor: pointer; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
+      .sidebar-item:active { background: var(--bg3); }
+      .sidebar-item.active { background: var(--bg3); border-left: 3px solid var(--accent); }
+      .sidebar-item .item-title { flex: 1; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .sidebar-item .item-sub { font-size: 12px; color: var(--text2); }
+      .sidebar-item .item-del { color: var(--text2); background: none; border: none; cursor: pointer; padding: 6px 8px; border-radius: 6px; min-width: 36px; min-height: 36px; display: flex; align-items: center; justify-content: center; }
+      .sidebar-item .item-del:active { color: var(--red); background: var(--bg3); }
+      .sidebar-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 40px;
+        height: 40px;
+        background: none;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        color: var(--text);
+        font-size: 18px;
+        cursor: pointer;
+        flex-shrink: 0;
+      }
+      .sidebar-toggle:active { background: var(--bg3); }
+      .split-layout { display: flex; flex: 1; overflow: hidden; position: relative; }
+      .split-main { flex: 1; display: flex; flex-direction: column; overflow: hidden; width: 100%; }
+
+      @media (min-width: 768px) {
+        .msg { padding: 12px 16px; }
+        .msg-avatar { font-size: 16px; }
+        .msg-name { font-size: 13px; }
+        .msg-actions { opacity: 0; transition: opacity 0.15s; }
+        .msg:hover .msg-actions { opacity: 1; }
+        .msg-btn { padding: 2px 5px; font-size: 13px; min-width: auto; min-height: auto; }
+        .code-block { border-radius: 8px; }
+        .copy-code-btn { min-height: auto; }
+        .input-bar { padding: 12px 16px; padding-bottom: 12px; }
+        .chat-input { font-size: 13px; border-radius: 6px; padding: 9px 12px; max-height: 200px; }
+        .send-btn { height: 38px; border-radius: 6px; }
+        .model-select { padding: 5px 8px; font-size: 12px; min-height: auto; border-radius: 6px; }
+        .chat-toolbar { padding: 8px 16px; }
+        .chat-toolbar .title-input { font-size: 14px; }
+        .sidebar {
+          position: static;
+          width: 240px;
+          max-width: none;
+          transform: none;
+          transition: none;
+          flex-shrink: 0;
+          z-index: auto;
+        }
+        .sidebar-backdrop { display: none !important; }
+        .sidebar-header { padding: 12px; }
+        .sidebar-header h3 { font-size: 13px; }
+        .sidebar-item { padding: 10px 12px; gap: 8px; }
+        .sidebar-item .item-title { font-size: 13px; }
+        .sidebar-item .item-sub { font-size: 11px; }
+        .sidebar-item .item-del { opacity: 0; padding: 2px 5px; min-width: auto; min-height: auto; }
+        .sidebar-item:hover .item-del { opacity: 1; }
+        .sidebar-item:hover { background: var(--bg3); }
+        .sidebar-toggle { display: none; }
+      }
     `;
     document.head.appendChild(style);
   }
