@@ -7,6 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>LLMPlayground</title>
+  <link rel="stylesheet" href="css/coding-editor.css">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -281,9 +282,32 @@
   </div>
   <div class="toast-container" id="toasts"></div>
 
+  <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs/loader.min.js"></script>
+  <script>
+    window.MonacoReady = new Promise(function(resolve) {
+      require.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs' } });
+      require(['vs/editor/editor.main'], function() {
+        monaco.editor.defineTheme('llmplayground', {
+          base: 'vs-dark',
+          inherit: true,
+          rules: [],
+          colors: {
+            'editor.background': '#141414',
+            'editor.foreground': '#e0e0e0',
+            'editorLineNumber.foreground': '#555',
+            'editorCursor.foreground': '#7c6af7',
+            'editor.selectionBackground': '#3a3560',
+            'editor.lineHighlightBackground': '#1a1a2e'
+          }
+        });
+        resolve();
+      });
+    });
+  </script>
   <script src="js/store.js"></script>
   <script src="js/api.js"></script>
   <script src="js/components.js"></script>
+  <script src="js/editor-panel.js"></script>
   <script src="js/pages/chat.js"></script>
   <script src="js/pages/roleplay.js"></script>
   <script src="js/pages/coding.js"></script>

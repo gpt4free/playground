@@ -4,30 +4,74 @@ const CodingPage = (() => {
   let isStreaming = false;
   let abortController = null;
 
-  const SYSTEM_PROMPT = `You are an expert coding assistant. When writing code:
-- Always use code blocks with the correct language tag
-- Explain what the code does briefly before or after
-- Point out potential issues or improvements
-- Prefer modern, idiomatic patterns
-- Be concise but thorough`;
+  const CODING_INSTRUCTION = [
+    '[Instructions for this conversation: You are an expert coding assistant.',
+    '',
+    'When CREATING new files, use fenced code blocks with language and filename:',
+    '```lang:filename.ext',
+    'code here',
+    '```',
+    'For example: ```js:app.js or ```py:main.py',
+    '',
+    'When EDITING existing files, use SEARCH/REPLACE blocks. Write the filename on its own line, then the edit block:',
+    'filename.ext',
+    '<<<<<<< SEARCH',
+    'exact lines to find',
+    '=======',
+    'replacement lines',
+    '>>>>>>> REPLACE',
+    '',
+    'You may also use XML-style edits:',
+    '<edit file="filename.ext">',
+    '<search>',
+    'exact lines to find',
+    '</search>',
+    '<replace>',
+    'replacement lines',
+    '</replace>',
+    '</edit>',
+    '',
+    'You can make multiple edits to the same or different files. The SEARCH section must match the existing code exactly.',
+    '',
+    'Rules:',
+    '- For new files, always use ```lang:filename.ext format',
+    '- For edits to existing files, use SEARCH/REPLACE blocks or XML edit blocks',
+    '- Explain changes briefly before or after the code',
+    '- Point out potential issues or improvements',
+    '- Prefer modern, idiomatic patterns',
+    '- Be concise but thorough',
+    '',
+    'The current files in the project will be shown to you before each message.]',
+    '',
+    '',
+  ].join('\n');
 
   function render(container) {
     Components.injectStyles();
-    injectCodingStyles();
     container.innerHTML = '';
 
-    const layout = document.createElement('div');
-    layout.className = 'split-layout';
+    const outerLayout = document.createElement('div');
+    outerLayout.className = 'split-layout';
 
     const backdrop = document.createElement('div');
     backdrop.className = 'sidebar-backdrop';
     backdrop.id = 'code-sidebar-backdrop';
     backdrop.addEventListener('click', closeSidebar);
 
-    layout.appendChild(backdrop);
-    layout.appendChild(buildSidebar());
-    layout.appendChild(buildMain());
-    container.appendChild(layout);
+    outerLayout.appendChild(backdrop);
+    outerLayout.appendChild(buildSidebar());
+
+    const codingLayout = document.createElement('div');
+    codingLayout.className = 'coding-layout';
+    codingLayout.id = 'coding-layout';
+
+    codingLayout.appendChild(buildChatPane());
+    codingLayout.appendChild(buildEditorPane());
+
+    outerLayout.appendChild(codingLayout);
+    container.appendChild(outerLayout);
+
+    EditorPanel.init(document.getElementById('coding-editor-pane'));
 
     const chats = Store.getChats().filter(c => c.type === 'coding');
     if (chats.length > 0) loadChat(chats[0].id);
@@ -89,10 +133,10 @@ const CodingPage = (() => {
     });
   }
 
-  function buildMain() {
-    const main = document.createElement('div');
-    main.className = 'split-main';
-    main.id = 'code-main';
+  function buildChatPane() {
+    const pane = document.createElement('div');
+    pane.className = 'coding-chat-pane';
+    pane.id = 'code-chat-pane';
 
     const toolbar = document.createElement('div');
     toolbar.className = 'chat-toolbar';
@@ -154,18 +198,41 @@ const CodingPage = (() => {
     });
     inputBar.id = 'code-input-bar';
 
-    main.appendChild(toolbar);
-    main.appendChild(messagesWrap);
-    main.appendChild(inputBar);
+    pane.appendChild(toolbar);
+    pane.appendChild(messagesWrap);
+    pane.appendChild(inputBar);
 
-    return main;
+    return pane;
+  }
+
+  function buildEditorPane() {
+    const pane = document.createElement('div');
+    pane.className = 'coding-editor-pane';
+    pane.id = 'coding-editor-pane';
+
+    pane.innerHTML = `
+      <div class="editor-toolbar">
+        <span class="editor-toolbar-title">Files</span>
+        <button class="btn btn-secondary btn-sm" data-action="toggle-diff">Diff</button>
+        <button class="btn btn-secondary btn-sm" data-action="download">↓ Save</button>
+        <button class="btn btn-secondary btn-sm" data-action="download-all">↓ All</button>
+      </div>
+      <div class="editor-tabs"></div>
+      <div class="editor-container">
+        <div class="editor-empty">
+          <div class="editor-empty-icon">📄</div>
+          <div class="editor-empty-text">Code blocks from responses will appear here</div>
+        </div>
+      </div>`;
+
+    return pane;
   }
 
   function newChat() {
     const id = Store.newId();
     const chat = {
       id, type: 'coding', title: 'New Session',
-      messages: [{ id: Store.newId(), role: 'system', content: SYSTEM_PROMPT, ts: Date.now() }],
+      messages: [],
       createdAt: Date.now(),
     };
     Store.upsertChat(chat);
@@ -184,8 +251,98 @@ const CodingPage = (() => {
     const modelSel = document.querySelector('#code-toolbar .model-select');
     if (modelSel) modelSel.value = currentModel;
 
+    EditorPanel.reset();
+
+    chat.messages.forEach(msg => {
+      if (msg.role === 'assistant' && msg.content) {
+        EditorPanel.applyEditsFromContent(msg.content);
+        EditorPanel.addFilesFromContent(msg.content);
+      }
+    });
+
     renderMessages(chat.messages);
     refreshSidebar();
+  }
+
+  function stripInstruction(content) {
+    if (content && content.startsWith(CODING_INSTRUCTION)) {
+      return content.slice(CODING_INSTRUCTION.length);
+    }
+    return content;
+  }
+
+  function stripFileContext(content) {
+    return content.replace(/<current_files>[\s\S]*?<\/current_files>\n*/g, '');
+  }
+
+  function cleanDisplayContent(content) {
+    return stripFileContext(stripInstruction(content));
+  }
+
+  function replaceCodeBlocksWithBadges(content) {
+    return content.replace(/```([^\n]*)\n[\s\S]*?```/g, (match, rawLang) => {
+      const colonIdx = rawLang.indexOf(':');
+      let lang = rawLang.trim();
+      let filename = '';
+      if (colonIdx > 0) {
+        lang = rawLang.slice(0, colonIdx).trim();
+        filename = rawLang.slice(colonIdx + 1).trim();
+      }
+      if (lang === 'sh' || lang === 'bash' || lang === 'zsh' || lang === 'shell') {
+        return match;
+      }
+      const label = Components.escHtml(filename || (lang ? `${lang} file` : 'file'));
+      return `BADGE_FILE:${label}:ENDBADGE`;
+    });
+  }
+
+  function replaceSearchReplaceWithBadges(content) {
+    let result = content;
+
+    result = result.replace(/(?:^|\n)([^\n]+)\n<{3,}\s*SEARCH\s*\n[\s\S]*?\n>{3,}\s*REPLACE\s*/g, (match, filenameLine) => {
+      const fname = Components.escHtml(filenameLine.trim());
+      return `\nBADGE_EDIT:${fname}:ENDBADGE`;
+    });
+
+    result = result.replace(/<{3,}\s*SEARCH\s*\n[\s\S]*?\n>{3,}\s*REPLACE\s*/g, () => {
+      return 'BADGE_EDIT:file:ENDBADGE';
+    });
+
+    result = result.replace(/<edit\s+(?:[^>]*?)file\s*=\s*["']([^"']+)["'][^>]*>\s*<search>[\s\S]*?<\/replace>\s*<\/edit>/gi, (match, fname) => {
+      return `BADGE_EDIT:${Components.escHtml(fname.trim())}:ENDBADGE`;
+    });
+
+    result = result.replace(/<search>\s*\n?[\s\S]*?\n?\s*<\/search>\s*<replace>\s*\n?[\s\S]*?\n?\s*<\/replace>/gi, () => {
+      return 'BADGE_EDIT:file:ENDBADGE';
+    });
+
+    return result;
+  }
+
+  function postProcessBadges(el) {
+    const contentEl = el.querySelector('.msg-content');
+    if (!contentEl) return;
+    let html = contentEl.innerHTML;
+    html = html.replace(/BADGE_FILE:([^:]*):ENDBADGE/g, (_, label) => {
+      return `<span class="file-edit-badge" data-open-file="${label}"><span class="file-edit-badge-icon">📄</span><span class="file-edit-badge-name">${label}</span><span class="file-edit-badge-action">Open in Editor →</span></span>`;
+    });
+    html = html.replace(/BADGE_EDIT:([^:]*):ENDBADGE/g, (_, label) => {
+      return `<span class="file-edit-badge edited" data-open-file="${label}"><span class="file-edit-badge-icon">✏️</span><span class="file-edit-badge-name">${label}</span><span class="file-edit-badge-action">Edited ✓</span></span>`;
+    });
+    contentEl.innerHTML = html;
+    contentEl.querySelectorAll('.file-edit-badge').forEach(badge => {
+      badge.addEventListener('click', () => {
+        const fname = badge.dataset.openFile;
+        const editorFiles = EditorPanel.getFiles();
+        const idx = editorFiles.findIndex(f => f.name === fname);
+        if (idx >= 0) {
+          const isMobile = window.innerWidth < 768;
+          if (isMobile) {
+            document.getElementById('editor-fab')?.click();
+          }
+        }
+      });
+    });
   }
 
   function renderMessages(messages) {
@@ -213,12 +370,50 @@ const CodingPage = (() => {
       return;
     }
     visible.forEach(msg => {
-      const el = Components.renderMessage(msg, { deletable: true });
+      let displayContent = msg.content;
+      if (msg.role === 'user') {
+        displayContent = cleanDisplayContent(displayContent);
+      }
+      if (msg.role === 'assistant') {
+        displayContent = replaceSearchReplaceWithBadges(displayContent);
+        displayContent = replaceCodeBlocksWithBadges(displayContent);
+      }
+      const displayMsg = Object.assign({}, msg, { content: displayContent });
+      const el = Components.renderMessage(displayMsg, { deletable: true });
+      if (msg.role === 'assistant') postProcessBadges(el);
       el.querySelector('[data-action="delete"]')?.addEventListener('click', () => deleteMessage(msg.id));
-      el.querySelector('[data-action="copy"]')?.addEventListener('click', () => Components.copyMessageContent(msg));
+      el.querySelector('[data-action="copy"]')?.addEventListener('click', () => Components.copyMessageContent(displayMsg));
       wrap.appendChild(el);
     });
     wrap.scrollTop = wrap.scrollHeight;
+  }
+
+  function buildMessagesForApi(chatMessages) {
+    const filesContext = EditorPanel.getFilesContext();
+    const apiMessages = [];
+
+    chatMessages.forEach((msg, idx) => {
+      if (msg.role === 'user') {
+        apiMessages.push(msg);
+      } else {
+        apiMessages.push(msg);
+      }
+    });
+
+    if (filesContext && apiMessages.length > 0) {
+      const lastUserIdx = apiMessages.length - 1;
+      for (let i = apiMessages.length - 1; i >= 0; i--) {
+        if (apiMessages[i].role === 'user') {
+          const original = apiMessages[i].content;
+          apiMessages[i] = Object.assign({}, apiMessages[i], {
+            content: filesContext + '\n\n' + original,
+          });
+          break;
+        }
+      }
+    }
+
+    return apiMessages;
   }
 
   async function sendMessage(text) {
@@ -230,17 +425,20 @@ const CodingPage = (() => {
     const settings = Store.getSettings();
     const model = currentModel || provider.defaultModel;
 
-    const userMsg = { id: Store.newId(), role: 'user', content: text, ts: Date.now() };
+    const isFirstUserMessage = chat.messages.filter(m => m.role === 'user').length === 0;
+    const content = isFirstUserMessage ? CODING_INSTRUCTION + text : text;
+    const userMsg = { id: Store.newId(), role: 'user', content, ts: Date.now() };
     chat.messages.push(userMsg);
     Store.upsertChat(chat);
 
+    const displayUserMsg = Object.assign({}, userMsg, { content: text });
     const wrap = document.getElementById('code-messages');
     if (wrap) {
       const emptyState = wrap.querySelector('.empty-state');
       if (emptyState) emptyState.remove();
-      const userEl = Components.renderMessage(userMsg, { deletable: true });
+      const userEl = Components.renderMessage(displayUserMsg, { deletable: true });
       userEl.querySelector('[data-action="delete"]')?.addEventListener('click', () => deleteMessage(userMsg.id));
-      userEl.querySelector('[data-action="copy"]')?.addEventListener('click', () => Components.copyMessageContent(userMsg));
+      userEl.querySelector('[data-action="copy"]')?.addEventListener('click', () => Components.copyMessageContent(displayUserMsg));
       wrap.appendChild(userEl);
       wrap.scrollTop = wrap.scrollHeight;
     }
@@ -258,13 +456,14 @@ const CodingPage = (() => {
 
     let typingRemoved = false;
 
+    const apiMessages = buildMessagesForApi(chat.messages);
+
     try {
       let fullContent = '';
       let fullThinking = '';
       const images = [];
-      for await (const chunk of API.streamChat(provider, chat.messages, model, {
+      for await (const chunk of API.streamChat(provider, apiMessages, model, {
         temperature: 0.3,
-        maxTokens: settings.maxTokens,
         signal: abortController.signal,
       })) {
         if (chunk.type === 'thinking') {
@@ -317,6 +516,14 @@ const CodingPage = (() => {
       assistantMsg.content = fullContent;
       assistantMsg.thinking = fullThinking;
       assistantMsg.images = images;
+
+      EditorPanel.applyEditsFromContent(fullContent);
+      EditorPanel.addFilesFromContent(fullContent);
+
+      let badgeContent = replaceSearchReplaceWithBadges(fullContent);
+      badgeContent = replaceCodeBlocksWithBadges(badgeContent);
+      contentEl.innerHTML = Components.renderMarkdown(badgeContent);
+      postProcessBadges(assistantEl);
     } catch (err) {
       if (err.name !== 'AbortError') {
         assistantMsg.content = `Error: ${err.message}`;
@@ -368,16 +575,6 @@ const CodingPage = (() => {
     } else {
       refreshSidebar();
     }
-  }
-
-  function injectCodingStyles() {
-    if (document.getElementById('coding-css')) return;
-    const style = document.createElement('style');
-    style.id = 'coding-css';
-    style.textContent = `
-      #code-messages .code-block { border-left: 3px solid var(--accent); }
-    `;
-    document.head.appendChild(style);
   }
 
   return { render };
