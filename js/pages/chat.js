@@ -77,7 +77,7 @@ const ChatPage = (() => {
         item.innerHTML = `
           <div style="flex:1;min-width:0">
             <div class="item-title">${Components.escHtml(chat.title || 'Untitled')}</div>
-            <div class="item-sub">${chat.items?.length || 0} ${Components.escHtml(framework.translate('messages'))}</div>
+            <div class="item-sub">${chat.count} ${Components.escHtml(framework.translate('messages'))}</div>
           </div>
           <button class="item-del" title="Delete">✕</button>`;
         item.addEventListener('click', e => {

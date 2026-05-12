@@ -251,7 +251,9 @@ const Components = (() => {
               iframe: [ 'src', 'type', 'frameborder', 'allow', 'height', 'width' ],
               audio: [ 'src', 'controls' ],
               video: [ 'src', 'controls', 'loop', 'autoplay', 'muted' ],
-              div: [ 'class' ]
+              div: [ 'class' ],
+              table: [ 'class' ],
+              blockquote: [ 'class' ]
           },
           allowedIframeHostnames: ['www.youtube.com'],
           allowedSchemes: [ 'http', 'https', 'data' ]
@@ -286,18 +288,37 @@ const Components = (() => {
       `<pre class="code-block"><div class="code-lang">${lang || 'code'}</div><code>${code.trim()}</code><button class="copy-code-btn" onclick="navigator.clipboard.writeText(this.previousElementSibling.textContent)">Copy</button></pre>`
     );
     html = html.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
-    html = html.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
     html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1">');
     html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
     html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
     html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
-    html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
-    html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
-    html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
-    html = html.replace(/^[-*] (.+)$/gm, '<li>$1</li>');
-    html = html.replace(/(<li>.*<\/li>\n?)+/g, m => `<ul>${m}</ul>`);
+    html = html.replace(/\n---\n+/g, '<hr>\n');
+    html = html.replace(/^##### (.+)\n*/gm, '<h5>$1</h5>\n');
+    html = html.replace(/^#### (.+)\n*/gm, '<h4>$1</h4>\n');
+    html = html.replace(/^### (.+)\n*/gm, '<h3>$1</h3>\n');
+    html = html.replace(/^## (.+)\n*/gm, '<h2>$1</h2>\n');
+    html = html.replace(/^# (.+)\n*/gm, '<h1>$1</h1>\n');
+    html = html.replace(/^[-*] (.+)?$/gm, '<li>$1</li>');
     html = html.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+    html = html.replace(/(<li>.*<\/li>\n?)+/g, m => `<ul>${m}</ul>`);
+    html = html.replaceAll('</ul>\n', '</ul>');
+    html = html.replaceAll('</li>\n', '</li>');
+    html = html.replace(/^((?:\|.+\|\n?)+)/gm, tableBlock => {
+      const rows = tableBlock.trim().split('\n');
+      if (rows.length < 2) return tableBlock;
+      const isSeparator = r => /^\|[\s\-:|]+\|$/.test(r.trim());
+      const parseRow = (r, tag) => '<tr>' + r.trim().replace(/^\||\|$/g, '').split('|').map(c => `<${tag}>${c.trim()}</${tag}>`).join('') + '</tr>';
+      let thead = '', tbody = '', sepIdx = rows.findIndex(isSeparator);
+      if (sepIdx === 1) {
+        thead = `<thead>${parseRow(rows[0], 'th')}</thead>`;
+        tbody = `<tbody>${rows.slice(2).filter(r => !isSeparator(r)).map(r => parseRow(r, 'td')).join('')}</tbody>`;
+      } else {
+        tbody = `<tbody>${rows.filter(r => !isSeparator(r)).map(r => parseRow(r, 'td')).join('')}</tbody>`;
+      }
+      return `<table class="md-table">${thead}${tbody}</table>`;
+    });
     html = html.replace(/\n\n/g, '</p><p>');
+    html = html.replace(/>\n/g, '>');
     html = html.replace(/\n/g, '<br>');
     html = html
         .replaceAll("<a href=", '<a target="_blank" href=')
@@ -435,6 +456,11 @@ const Components = (() => {
       .copy-code-btn { position: absolute; top: 8px; right: 8px; background: var(--bg3); border: 1px solid var(--border); color: var(--text2); padding: 4px 10px; border-radius: 6px; font-size: 12px; cursor: pointer; min-height: 32px; }
       .copy-code-btn:active { color: var(--text); }
       .inline-code { background: var(--code-bg); border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px; font-family: monospace; font-size: 13px; }
+      .md-blockquote { border-left: 3px solid var(--accent); margin: 8px 0; padding: 6px 12px; background: var(--bg3); color: var(--text2); border-radius: 0 6px 6px 0; }
+      .md-table { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: 13px; }
+      .md-table th, .md-table td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; }
+      .md-table thead th { background: var(--bg3); font-weight: 600; }
+      .md-table tbody tr:nth-child(even) { background: var(--bg2); }
       .input-bar { display: flex; gap: 8px; padding: 10px 12px; padding-bottom: calc(10px + var(--safe-bottom)); border-top: 1px solid var(--border); background: var(--bg2); align-items: flex-end; }
       .chat-input { flex: 1; padding: 10px 12px; resize: none; line-height: 1.5; max-height: 160px; overflow-y: auto; font-size: 16px; border-radius: 10px; }
       .send-btn { flex-shrink: 0; height: 44px; padding: 0 18px; border-radius: 10px; }

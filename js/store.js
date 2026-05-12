@@ -26,9 +26,6 @@ const Store = (() => {
         if (data.providerLocalStorage[key]) {
           provider.apiKey = localStorage.getItem(data.providerLocalStorage[key]);
         }
-        if (!provider.apiKey && provider.backupUrl) {
-          provider.apiKey = localStorage.getItem("session_token");
-        }
       }
       delete data.providers.custom;
       Store.setProviders(Object.values(data.providers));
@@ -116,7 +113,11 @@ const Store = (() => {
   function getActiveProvider() {
     const providers = getProviders();
     const id = getActiveProviderId();
-    return providers.find(p => p.id === id) || providers[0];
+    const provider = providers.find(p => p.id === id) || providers[0];
+    if (!provider.apiKey && provider.backupUrl) {
+      provider.apiKey = localStorage.getItem("session_token");
+    }
+    return provider;
   }
 
   function upsertProvider(provider) {
@@ -192,6 +193,8 @@ const Store = (() => {
           request.onsuccess = event => {
               const cursor = event.target.result;
               if (cursor) {
+                  cursor.value.count = cursor.value.items?.filter(m => m.role !== 'system').length || 0;
+                  delete cursor.value.items;
                   conversations.push(cursor.value);
                   cursor.continue();
               } else {

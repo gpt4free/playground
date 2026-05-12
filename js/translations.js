@@ -49,13 +49,13 @@ framework.translateElements = function (elements = null) {
         if (["SCRIPT", "STYLE"].includes(element.tagName)) {
             return;
         }
-        for (const child of element.childNodes) {
+        element.childNodes.forEach(child => {
             if (child.nodeType === Node.TEXT_NODE) {
                 if (countWords(child.textContent) > 0) {
                     child.textContent = framework.translate(child.textContent);
                 }
             }
-        }
+        });
         if (element.alt) {
             element.alt = framework.translate(element.alt);
         }
@@ -73,14 +73,7 @@ framework.translateElements = function (elements = null) {
 
 
 function deleteTranslations() {
-    const keys = [];
-    for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith("translations")) {
-            keys.push(key);
-        }
-    }
-    keys.forEach(k => localStorage.removeItem(k));
+    localStorage.removeItem(framework.translationKey);
 }
 
 function btnTranslate(btn) {
@@ -124,7 +117,7 @@ async function query(prompt, options = { json: false, cache: true }) {
         options = { json: options, cache: true };
     }
     const encodedParams = (new URLSearchParams(options)).toString();
-    const secondPartyUrl = `https://g4f.space/ai/auto/${encodeURIComponent(prompt)}${encodedParams ? "?" + encodedParams : ""}`;
+    const secondPartyUrl = `https://g4f.space/ai/auto/${encodeURIComponent(prompt)}?${encodedParams}`;
     let response;
     try {
         response = await fetch(secondPartyUrl, {
@@ -134,7 +127,7 @@ async function query(prompt, options = { json: false, cache: true }) {
         });
         window.captureUserTierHeaders?.(response.headers);
     } catch (e) {
-        add_error(`Error fetching URL: \`${secondPartyUrl}\``, e);
+        console.warn(`Error fetching URL: \`${secondPartyUrl}\``, e);
     }
     if (response && !response.ok) {
         const delay = parseInt(response.headers.get('Retry-After'), 10);
@@ -149,18 +142,18 @@ async function query(prompt, options = { json: false, cache: true }) {
                 });
                 window.captureUserTierHeaders?.(response.headers);
             } catch (e) {
-                add_error(`Error fetching URL: \`${secondPartyUrl}\``, e);
+                console.warn(`Error fetching URL: \`${secondPartyUrl}\``, e);
             }
         }
     }
     if (!response || !response.ok) {
         if (response) {
-            add_error(`Error ${response.status} with URL: \`${secondPartyUrl}\`\n ${await response.clone().text()}`, true);
+            console.warn(`Error ${response.status} with URL: \`${secondPartyUrl}\`\n ${await response.clone().text()}`);
         }
-        const firstPartyUrl = `https://g4f.space/ai/pollinations/${encodeURIComponent(prompt)}${encodedParams ? "?" + encodedParams : ""}`;
+        const firstPartyUrl = `https://g4f.space/ai/pollinations/${encodeURIComponent(prompt)}?${encodedParams}`;
         response = await fetch(firstPartyUrl, { headers: { "Authorization": `Bearer ${["pk", "_7X0QLj0xijSd0xj7"].join("")}` } });
         if (!response.ok) {
-            add_error(`Error ${response.status} with URL: \`${firstPartyUrl}\`\n ${await response.clone().text()}`, true);
+            console.warn(`Error ${response.status} with URL: \`${firstPartyUrl}\`\n ${await response.clone().text()}`);
             return response;
         }
     }
@@ -173,7 +166,7 @@ async function query(prompt, options = { json: false, cache: true }) {
                 return new Response(filterMarkdown(text, ["json"], text), response);
             }
         } catch (e) {
-            add_error(`Error parsing JSON response from URL: \`${response.url}\``, e);
+            console.warn(`Error parsing JSON response from URL: \`${response.url}\``, e);
         }
     }
     return response;
@@ -203,10 +196,6 @@ framework.translateAll = async () => {
     return allTranslations;
 };
 
-framework.trans_escape = (text) => {
-    return framework.escape(framework.translate(text));
-};
-
 try {
     if (document.readyState === "loading") {
         document.addEventListener("DOMContentLoaded", () => {
@@ -216,5 +205,5 @@ try {
         framework.translateElements();
     }
 } catch (e) {
-    add_error(e, true);
+    console.warn(e);
 }

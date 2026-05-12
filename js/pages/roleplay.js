@@ -75,7 +75,7 @@ const RoleplayPage = (() => {
         item.innerHTML = `
           <div style="flex:1;min-width:0">
           <div class="item-title">${Components.escHtml(chat.title || framework.translate('Untitled'))}</div>
-          <div class="item-sub">${persona ? Components.escHtml(persona.name) : framework.translate('No persona')} · ${chat.items?.filter(m => m.role !== 'system').length || 0} ${Components.escHtml(framework.translate('messages'))}</div>
+          <div class="item-sub">${persona ? Components.escHtml(persona.name) : framework.translate('No persona')} · ${chat.count} ${Components.escHtml(framework.translate('messages'))}</div>
         </div>
         <button class="item-del" title="Delete">✕</button>`;
         item.addEventListener('click', e => {
