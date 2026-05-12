@@ -302,7 +302,7 @@ const API = (() => {
       }
     }
 
-    const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
+    const lastUserMsg = [...items].reverse().find(m => m.role === 'user');
     const prompt = lastUserMsg?.content || '';
     if (prompt) {
       try {
@@ -380,7 +380,7 @@ const API = (() => {
 
     const body = {
       model: model || provider.defaultModel || 'llama-4-scout',
-      messages,
+      messages: messages.map(m => ({ role: m.role, content: m.content })),
       stream: true,
       temperature: options.temperature ?? 0.7,
     };

@@ -116,8 +116,8 @@ const PersonasPage = (() => {
           <div id="pe-error" style="color:var(--red);font-size:13px;min-height:18px;margin-top:4px"></div>
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
-          <button class="btn btn-secondary" id="pe-cancel">Cancel</button>
-          <button class="btn btn-primary" id="pe-save">${isNew ? 'Create' : 'Save'}</button>
+          <button class="btn btn-secondary" id="pe-cancel">${framework.translate('Cancel')}</button>
+          <button class="btn btn-primary" id="pe-save">${isNew ? framework.translate('Create') : framework.translate('Save')}</button>
         </div>`;
 
       overlay.appendChild(modal);
@@ -157,7 +157,7 @@ const PersonasPage = (() => {
         };
 
         Store.upsertPersona(updated);
-        Components.toast(isNew ? 'Persona created' : 'Persona saved', 'success');
+        Components.toast(isNew ? framework.translate('Persona created') : framework.translate('Persona saved'), 'success');
         const content = document.getElementById('personas-content');
         if (content) renderPersonas(content);
         close();
@@ -168,7 +168,7 @@ const PersonasPage = (() => {
   }
 
   async function deletePersona(id) {
-    const ok = await Components.confirm('Delete this persona?');
+    const ok = await Components.confirm(framework.translate('Are you sure you want to delete this persona?'));
     if (!ok) return;
     Store.deletePersona(id);
     const content = document.getElementById('personas-content');
