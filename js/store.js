@@ -29,6 +29,7 @@ const Store = (() => {
       }
       delete data.providers.custom;
       Store.setProviders(Object.values(data.providers));
+      Store.setActiveProviderId(document.location.hostname === 'llmplayground.net' ? 'api.airforce' : Object.keys(data.providers)[0]);
       ProvidersPage.renderList();
     });
   }

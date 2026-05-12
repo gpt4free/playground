@@ -17,7 +17,7 @@ fetch('js/snippets.json')
     .catch(() => {});
 
 framework.translate = (text) => {
-    const stripText = text.trim();
+    const stripText = text.trim().replace(/\s+/g, ' ');
     if (stripText) {
         const startWithSpace = text.startsWith(" ");
         const endWithSpace = text.endsWith(" ");
@@ -176,13 +176,10 @@ framework.translateAll = async () => {
     if (navigator.language === "en" || navigator.language.startsWith("en-")) {
         return false;
     }
-    let allTranslations = { ...framework.translations };
-    for (const text of newTranslations) {
+    let allTranslations = {};
+    newTranslations.forEach(text => {
         allTranslations[text] = "";
-    }
-    for (const key in allTranslations) {
-        allTranslations[key] = "";
-    }
+    });
     const jsonTranslations = "\n\n```json\n" + JSON.stringify(allTranslations, null, 4) + "\n```";
     const languageName = navigator.language === "de" ? 'de-DE' : navigator.language === "es" ? 'es-ES' : navigator.language;
     const jsonLanguage = "`" + languageName + "`";
