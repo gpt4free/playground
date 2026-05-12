@@ -6,6 +6,9 @@ const Store = (() => {
     chats: 'llmp_chats',
     settings: 'llmp_settings',
   };
+  const DB_NAME = 'chat-db';
+  const STORE_NAME = 'conversations';
+  const VERSION = 1;
 
   function loadProviders() {
     const url = 'https://g4f.dev/dist/js/providers.json';
@@ -60,6 +63,36 @@ const Store = (() => {
       theme: 'dark',
     },
   };
+
+  let privateConversation;
+
+  function openDB() {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(DB_NAME, VERSION);
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result);
+
+      request.onupgradeneeded = () => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains(STORE_NAME)) {
+          db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+        }
+      };
+    });
+  }
+
+  function withStore(mode) {
+    return openDB().then(db => {
+      const tx = db.transaction(STORE_NAME, mode);
+      return {
+        store: tx.objectStore(STORE_NAME),
+        done: new Promise((res, rej) => {
+          tx.oncomplete = () => res();
+          tx.onerror = () => rej(tx.error);
+        }),
+      };
+    });
+  }
 
   function get(key) {
     try {
@@ -117,24 +150,82 @@ const Store = (() => {
     setPersonas(getPersonas().filter(p => p.id !== id));
   }
 
-  function getChats() { return get('chats'); }
-  function setChats(v) { set('chats', v); }
-
-  function getChat(id) {
-    return getChats().find(c => c.id === id) || null;
+  async function getChat(id) {
+      if (!id) {
+          return privateConversation;
+      }
+      const { store } = await withStore('readonly');
+      return new Promise((resolve, reject) => {
+          const request = store.get(id);
+          request.onsuccess = () => {
+            request.result.items = request.result.items || [];
+            request.result.type = request.result.type || 'chat';
+            request.result.items.forEach((item, index) => {
+              item.id = item.id || index;
+            });
+            resolve(request.result);
+          };
+          request.onerror = () => reject(request.error);
+      });
   }
 
-  function upsertChat(chat) {
-    const chats = getChats();
-    const idx = chats.findIndex(c => c.id === chat.id);
-    if (idx >= 0) chats[idx] = chat;
-    else chats.unshift(chat);
-    setChats(chats);
+  async function upsertChat(conv) {
+      if (!conv.id) {
+          privateConversation = conv;
+          return true;
+      }
+      conv.added = conv.added || Date.now();
+      conv.updated = Date.now();
+      conv.type = conv.type || 'chat';
+      const { store, done } = await withStore('readwrite');
+      store.put(conv);
+      return done;
   }
 
-  function deleteChat(id) {
-    setChats(getChats().filter(c => c.id !== id));
+  async function getChats() {
+    try {
+      const { store } = await withStore('readonly');
+      return new Promise((resolve, reject) => {
+          const conversations = [];
+          const request = store.openCursor();
+
+          request.onsuccess = event => {
+              const cursor = event.target.result;
+              if (cursor) {
+                  conversations.push(cursor.value);
+                  cursor.continue();
+              } else {
+                  if (conversations.length === 0) {
+                    conversations = get('chats');
+                    conversations.forEach((c, i)=>{
+                      c.added = c.added || Date.now();
+                      c.updated = c.updated || c.added || Date.now() + i;
+                      c.items = c.messages || c.items || [];
+                      delete c.messages;
+                    })
+                  } else {
+                    conversations.forEach(c => {
+                      c.type = c.type || 'chat';
+                    });
+                    conversations.sort((a, b) => (b.updated || b.added) - (a.updated || a.added));
+                  }
+                  resolve(conversations);
+              }
+          };
+
+          request.onerror = () => reject(request.error);
+      });
+    } catch (e) {
+        console.error("IndexedDB not available:", e);
+        return [];
+    }
   }
+
+  const deleteChat = async (id) => {
+      const { store, done } = await withStore('readwrite');
+      store.delete(id);
+      return done;
+  };
 
   function getSettings() { return get('settings'); }
   function setSettings(v) { set('settings', v); }
@@ -151,7 +242,7 @@ const Store = (() => {
     getProviders, setProviders, getActiveProviderId, setActiveProviderId,
     getActiveProvider, upsertProvider, deleteProvider,
     getPersonas, setPersonas, upsertPersona, deletePersona,
-    getChats, setChats, getChat, upsertChat, deleteChat,
+    getChats, getChat, upsertChat, deleteChat,
     getSettings, setSettings, updateSettings,
     newId, loadProviders,
   };

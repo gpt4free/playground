@@ -60,6 +60,7 @@ const Router = (() => {
     container.classList.add('active');
     Page.render(container);
     ProvidersPage.updateBadge();
+    framework.translateElements(container.querySelectorAll('*'));
   }
 
   function renderHome() {
@@ -70,7 +71,7 @@ const Router = (() => {
     container.style.cssText = 'overflow-y:auto;-webkit-overflow-scrolling:touch;';
     container.innerHTML = `
       <div style="max-width:700px;margin:0 auto;padding:32px 16px;text-align:center;">
-        <h1 style="font-size:28px;font-weight:800;color:var(--accent);margin-bottom:8px">LLMPlayground</h1>
+        <h1 class="notranslate" style="font-size:28px;font-weight:800;color:var(--accent);margin-bottom:8px">LLMPlayground</h1>
         <p style="color:var(--text2);font-size:15px;margin-bottom:32px">Your open-source AI playground — chat, roleplay, and code</p>
         <div style="display:grid;grid-template-columns:1fr;gap:12px;text-align:left;">
           ${[
@@ -100,6 +101,7 @@ const Router = (() => {
         </div>
       </div>`;
     ProvidersPage.updateBadge();
+    framework.translateElements(container.querySelectorAll('*'));
   }
 
   function renderPersonas() {
@@ -109,6 +111,7 @@ const Router = (() => {
     container.classList.add('active');
     PersonasPage.render(container);
     ProvidersPage.updateBadge();
+    framework.translateElements(container.querySelectorAll('*'));
   }
 
   function hideAll() {

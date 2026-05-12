@@ -13,19 +13,19 @@ const ProvidersPage = (() => {
     btnWrap.style.cssText = 'display:flex;gap:8px;';
     const resetBtn = document.createElement('button');
     resetBtn.className = 'btn btn-secondary btn-sm';
-    resetBtn.textContent = 'Reset';
+    resetBtn.textContent = framework.translate('Reset');
     resetBtn.addEventListener('click', () => Store.loadProviders());
     btnWrap.appendChild(resetBtn);
     const newBtn = document.createElement('button');
     newBtn.className = 'btn btn-primary btn-sm';
-    newBtn.textContent = '+ Add';
+    newBtn.textContent = framework.translate('+ Add');
     newBtn.addEventListener('click', () => openEditor(null));
     btnWrap.appendChild(newBtn);
     header.appendChild(btnWrap);
 
     const hint = document.createElement('p');
     hint.style.cssText = 'color:var(--text2);font-size:13px;margin-bottom:20px;line-height:1.5;';
-    hint.textContent = 'Add any provider — OpenAI, Anthropic, Google, or compatible APIs. The endpoint type is auto-detected.';
+    hint.textContent = framework.translate('Add any provider — OpenAI, Anthropic, Google, or compatible APIs. The endpoint type is auto-detected.');
 
     const list = document.createElement('div');
     list.id = 'providers-list';
@@ -79,11 +79,11 @@ const ProvidersPage = (() => {
         <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;flex-wrap:wrap">
           <div style="flex:1;min-width:0">
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-              <span style="font-weight:600;font-size:15px">${Components.escHtml(provider.name)}</span>
+              <span style="font-weight:600;font-size:15px" class="notranslate">${Components.escHtml(provider.name)}</span>
               ${isActive ? '<span style="font-size:11px;background:var(--accent);color:#fff;padding:2px 7px;border-radius:10px">Active</span>' : ''}
               <span style="font-size:11px;background:${endpointColor(epType)};color:#fff;padding:2px 7px;border-radius:10px">${endpointLabel(epType)}</span>
             </div>
-            <div style="font-size:12px;color:var(--text2);margin-top:4px;word-break:break-all">${Components.escHtml(provider.baseUrl)}</div>
+            <div style="font-size:12px;color:var(--text2);margin-top:4px;word-break:break-all" class="notranslate">${Components.escHtml(provider.baseUrl)}</div>
           </div>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
@@ -94,8 +94,8 @@ const ProvidersPage = (() => {
           ${provider.id !== 'airforce' ? `<button class="btn btn-danger btn-sm" data-action="delete">Delete</button>` : ''}
         </div>
         <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--text2)">
-          <span>Model: <strong style="color:var(--text)">${Components.escHtml(provider.defaultModel || '—')}</strong></span>
-          <span>Key: <strong style="color:var(--text)">${provider.apiKey ? '••••' + provider.apiKey.slice(-4) : 'None'}</strong></span>
+          <span>Model: <strong class="notranslate" style="color:var(--text)">${Components.escHtml(provider.defaultModel || '—')}</strong></span>
+          <span>Key: <strong class="notranslate" style="color:var(--text)">${provider.apiKey ? '••••' + provider.apiKey.slice(-4) : 'None'}</strong></span>
           <span>Cached: <strong style="color:var(--text)">${provider.fetchedModels?.length || 0}</strong></span>
         </div>
         ${provider.fetchedModels?.length ? `
@@ -189,8 +189,8 @@ const ProvidersPage = (() => {
         <div id="prov-status" style="font-size:13px;color:var(--text2);min-height:20px;margin-top:4px;display:flex;align-items:center;gap:8px"></div>
         <div id="prov-error" style="color:var(--red);font-size:13px;min-height:18px;margin-top:4px"></div>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
-          <button class="btn btn-secondary" id="prov-cancel">Cancel</button>
-          <button class="btn btn-primary" id="prov-save">${isNew ? 'Add' : 'Save'}</button>
+          <button class="btn btn-secondary" id="prov-cancel">${framework.translate('Cancel')}</button>
+          <button class="btn btn-primary" id="prov-save">${isNew ? framework.translate('Create') : framework.translate('Save')}</button>
         </div>`;
 
       overlay.appendChild(modal);
@@ -225,7 +225,7 @@ const ProvidersPage = (() => {
             detectedType = await API.detectEndpointType(baseUrl, apiKey);
             statusEl.innerHTML = `<span style="color:${endpointColor(detectedType)}">●</span> Detected: <strong style="color:var(--text)">${endpointLabel(detectedType)}</strong>`;
           } catch {
-            statusEl.innerHTML = '<span style="color:var(--yellow)">⚠</span> Detection failed, defaulting to OpenAI';
+            statusEl.innerHTML = `<span style="color:var(--yellow)">⚠</span> ${framework.translate('Detection failed, defaulting to OpenAI')}`;
             detectedType = 'openai';
           }
         }

@@ -24,9 +24,11 @@ const ChatPage = (() => {
     layout.appendChild(main);
     container.appendChild(layout);
 
-    const chats = Store.getChats().filter(c => c.type === 'chat');
-    if (chats.length > 0) loadChat(chats[0].id);
-    else newChat();
+    Store.getChats().then(chats => {
+      const chatList = chats.filter(c => c.type === 'chat');
+      if (chatList.length > 0) loadChat(chatList[0].id);
+      else newChat();
+    });
   }
 
   function toggleSidebar() {
@@ -62,30 +64,32 @@ const ChatPage = (() => {
     const list = (sidebar || document.getElementById('chat-sidebar'))?.querySelector('#chat-list');
     if (!list) return;
     list.innerHTML = '';
-    const chats = Store.getChats().filter(c => c.type === 'chat');
-    if (chats.length === 0) {
-      list.innerHTML = '<div style="padding:16px;color:var(--text2);font-size:13px">No chats yet</div>';
-      return;
-    }
-    chats.forEach(chat => {
-      const item = document.createElement('div');
-      item.className = 'sidebar-item' + (chat.id === currentChatId ? ' active' : '');
-      item.dataset.id = chat.id;
-      item.innerHTML = `
-        <div style="flex:1;min-width:0">
-          <div class="item-title">${Components.escHtml(chat.title || 'Untitled')}</div>
-          <div class="item-sub">${chat.messages?.length || 0} messages</div>
-        </div>
-        <button class="item-del" title="Delete">✕</button>`;
-      item.addEventListener('click', e => {
-        if (e.target.classList.contains('item-del')) {
-          deleteChat(chat.id);
-        } else {
-          loadChat(chat.id);
-          closeSidebar();
-        }
+    Store.getChats().then(chats => {
+      const chatList = chats.filter(c => c.type === 'chat');
+      if (chatList.length === 0) {
+        list.innerHTML = '<div style="padding:16px;color:var(--text2);font-size:13px">No chats yet</div>';
+        return;
+      }
+      chatList.forEach(chat => {
+        const item = document.createElement('div');
+        item.className = 'sidebar-item' + (chat.id === currentChatId ? ' active' : '');
+        item.dataset.id = chat.id;
+        item.innerHTML = `
+          <div style="flex:1;min-width:0">
+            <div class="item-title">${Components.escHtml(chat.title || 'Untitled')}</div>
+            <div class="item-sub">${chat.items?.length || 0} ${Components.escHtml(framework.translate('messages'))}</div>
+          </div>
+          <button class="item-del" title="Delete">✕</button>`;
+        item.addEventListener('click', e => {
+          if (e.target.classList.contains('item-del')) {
+            deleteChat(chat.id);
+          } else {
+            loadChat(chat.id);
+            closeSidebar();
+          }
+        });
+        list.appendChild(item);
       });
-      list.appendChild(item);
     });
   }
 
@@ -108,8 +112,9 @@ const ChatPage = (() => {
     titleInput.placeholder = 'Chat title...';
     titleInput.addEventListener('change', () => {
       if (!currentChatId) return;
-      const chat = Store.getChat(currentChatId);
-      if (chat) { chat.title = titleInput.value; Store.upsertChat(chat); }
+      Store.getChat(currentChatId).then(chat => {
+        if (chat) { chat.title = titleInput.value; Store.upsertChat(chat); }
+      });
     });
 
     const modelSel = Components.modelSelector(Store.getActiveProvider(), currentModel);
@@ -143,26 +148,27 @@ const ChatPage = (() => {
 
   function newChat() {
     const id = Store.newId();
-    const chat = { id, type: 'chat', title: 'New Chat', messages: [], createdAt: Date.now() };
+    const chat = { id, type: 'chat', title: framework.translate('New Chat'), items: [], createdAt: Date.now() };
     Store.upsertChat(chat);
     loadChat(id);
   }
 
   function loadChat(id) {
     currentChatId = id;
-    const chat = Store.getChat(id);
-    if (!chat) return;
+    Store.getChat(id).then(chat => {
+      console.log('Loaded chat:', chat);
+      if (!chat) return;
 
-    const titleInput = document.querySelector('#chat-toolbar .title-input');
-    if (titleInput) titleInput.value = chat.title || '';
+      const modelSel = document.querySelector('#chat-toolbar .model-select');
+      if (modelSel) {
+        currentModel = chat.model || Store.getActiveProvider()?.defaultModel;
+        modelSel.value = currentModel;
+      }
 
-    const modelSel = document.querySelector('#chat-toolbar .model-select');
-    if (modelSel) {
-      currentModel = chat.model || Store.getActiveProvider()?.defaultModel;
-      modelSel.value = currentModel;
-    }
-
-    renderMessages(chat.messages);
+      const titleInput = document.querySelector('#chat-toolbar .title-input');
+      if (titleInput) titleInput.value = chat.title || '';
+      renderMessages(chat.items || chat.items || []);
+    });
     refreshSidebar();
   }
 
@@ -172,6 +178,7 @@ const ChatPage = (() => {
     wrap.innerHTML = '';
     if (!messages || messages.length === 0) {
       wrap.innerHTML = `<div class="empty-state"><div class="big">💬</div><h2>Start a conversation</h2><p>Type a message below to begin</p></div>`;
+      framework.translateElements(wrap.querySelectorAll('*'));
       return;
     }
     messages.forEach(msg => {
@@ -186,7 +193,7 @@ const ChatPage = (() => {
 
   async function sendMessage(text) {
     if (isStreaming || !currentChatId) return;
-    const chat = Store.getChat(currentChatId);
+    const chat = await Store.getChat(currentChatId);
     if (!chat) return;
 
     const provider = Store.getActiveProvider();
@@ -194,7 +201,7 @@ const ChatPage = (() => {
     const model = currentModel || provider.defaultModel;
 
     const userMsg = { id: Store.newId(), role: 'user', content: text, ts: Date.now() };
-    chat.messages.push(userMsg);
+    chat.items.push(userMsg);
     Store.upsertChat(chat);
 
     const wrap = document.getElementById('chat-messages');
@@ -227,7 +234,7 @@ const ChatPage = (() => {
       let fullContent = '';
       let fullThinking = '';
       const images = [];
-      for await (const chunk of API.streamChat(provider, chat.messages.filter(m => m.role !== 'system' || true), model, {
+      for await (const chunk of API.streamChat(provider, chat.items.filter(m => m.role !== 'system' || true), model, {
         temperature: settings.temperature,
         maxTokens: settings.maxTokens,
         signal: abortController.signal,
@@ -299,8 +306,8 @@ const ChatPage = (() => {
 
     assistantEl.querySelector('[data-action="copy"]')?.addEventListener('click', () => Components.copyMessageContent(assistantMsg));
 
-    chat.messages.push(assistantMsg);
-    if (chat.title === 'New Chat' && chat.messages.length === 2) {
+    chat.items.push(assistantMsg);
+    if (chat.title === framework.translate('New Chat') && chat.items.length === 2) {
       chat.title = text.slice(0, 40) + (text.length > 40 ? '…' : '');
       const titleInput = document.querySelector('#chat-toolbar .title-input');
       if (titleInput) titleInput.value = chat.title;
@@ -315,30 +322,34 @@ const ChatPage = (() => {
 
   function deleteMessage(msgId) {
     if (!currentChatId) return;
-    const chat = Store.getChat(currentChatId);
-    if (!chat) return;
-    chat.messages = chat.messages.filter(m => m.id !== msgId);
-    Store.upsertChat(chat);
-    renderMessages(chat.messages);
+    Store.getChat(currentChatId).then(chat => {
+      if (!chat) return;
+      chat.items = chat.items.filter(m => m.id !== msgId);
+      Store.upsertChat(chat);
+      renderMessages(chat.items);
+    });
   }
 
   function clearMessages() {
     if (!currentChatId) return;
-    const chat = Store.getChat(currentChatId);
-    if (!chat) return;
-    chat.messages = [];
-    Store.upsertChat(chat);
-    renderMessages([]);
+    Store.getChat(currentChatId).then(chat => {
+      if (!chat) return;
+      chat.items = [];
+      Store.upsertChat(chat);
+      renderMessages([]);
+    });
   }
 
   async function deleteChat(id) {
-    const ok = await Components.confirm('Delete this chat?');
+    const ok = await Components.confirm(framework.translate('Are you sure you want to delete this session?'));
     if (!ok) return;
     Store.deleteChat(id);
     if (currentChatId === id) {
-      const remaining = Store.getChats().filter(c => c.type === 'chat');
-      if (remaining.length > 0) loadChat(remaining[0].id);
-      else newChat();
+      Store.getChats().then(chats => {
+        const remaining = chats.filter(c => c.type === 'chat');
+        if (remaining.length > 0) loadChat(remaining[0].id);
+        else newChat();
+      });
     } else {
       refreshSidebar();
     }

@@ -34,9 +34,9 @@ const Components = (() => {
   }
 
   function confirm(message) {
-    return modal('Confirm', `<p style="color:var(--text2)">${message}</p>`, [
-      { label: 'Cancel', cls: 'btn-secondary' },
-      { label: 'Confirm', cls: 'btn-primary' },
+    return modal(framework.translate('Confirm'), `<p style="color:var(--text2)">${message}</p>`, [
+      { label: framework.translate('Cancel'), cls: 'btn-secondary' },
+      { label: framework.translate('Confirm'), cls: 'btn-primary' },
     ]).then(i => i === 1);
   }
 
@@ -46,11 +46,11 @@ const Components = (() => {
     el.dataset.id = msg.id || '';
 
     const avatar = msg.role === 'user' ? '👤' : msg.role === 'system' ? '⚙️' : (opts.personaEmoji || '🤖');
-    const name = msg.role === 'user' ? 'You' : msg.role === 'system' ? 'System' : (opts.personaName || 'Assistant');
+    const name = msg.role === 'user' ? framework.translate('You') : msg.role === 'system' ? framework.translate('System') : (opts.personaName || framework.translate('Assistant'));
 
     let thinkingHtml = '';
-    if (msg.thinking) {
-      thinkingHtml = renderThinkingBlock(msg.thinking);
+    if (msg.thinking || msg.reasoning?.text) {
+      thinkingHtml = renderThinkingBlock(msg.thinking || msg.reasoning.text);
     }
 
     let imagesHtml = '';
@@ -239,13 +239,56 @@ const Components = (() => {
     });
   }
 
-  function renderMarkdown(text) {
-    if (!text) return '';
-    let html = escHtml(text);
+  const sanitizedConfig = () => {
+      return {
+          allowedTags: window?.sanitizeHtml?.defaults.allowedTags.concat(['img', 'iframe', 'audio', 'video', 'details', 'summary', 'div']),
+          allowedAttributes: {
+              a: [ 'href', 'title', 'target', 'rel', 'data-width', 'data-height', 'data-src' ],
+              i: [ 'class' ],
+              span: [ 'class' ],
+              code: [ 'class' ],
+              img: [ 'src', 'alt', 'width', 'height' ],
+              iframe: [ 'src', 'type', 'frameborder', 'allow', 'height', 'width' ],
+              audio: [ 'src', 'controls' ],
+              video: [ 'src', 'controls', 'loop', 'autoplay', 'muted' ],
+              div: [ 'class' ]
+          },
+          allowedIframeHostnames: ['www.youtube.com'],
+          allowedSchemes: [ 'http', 'https', 'data' ]
+      }
+  };
+
+  function renderMarkdown(content) {
+    if (!content) return '';
+    if (Array.isArray(content)) {
+        content = content.map((item) => {
+            if (!item.name) {
+                if (item.text) {
+                    return item.text;
+                }
+                size = parseInt(appStorage.getItem(`bucket:${item.bucket_id}`), 10);
+                return `**Bucket:** [[${item.bucket_id}]](${item.url})${size ? ` (${formatFileSize(size)})` : ""}`
+            }
+            if (item.name.endsWith(".wav") || item.name.endsWith(".mp3")) {
+                return `<audio controls src="${item.url}"></audio>` + (item.text ? `\n${item.text}` : "");
+            }
+            if (item.name.endsWith(".mp4") || item.name.endsWith(".webm")) {
+                return `<video controls src="${item.url}"></video>` + (item.text ? `\n${item.text}` : "");
+            }
+            if (item.width && item.height) {
+                return `<a href="${item.url}" data-width="${item.width}" data-height="${item.height}"><img src="${item.url.replaceAll("/media/", "/thumbnail/") || item.image_url?.url}" alt="${framework.escape(item.name)}"></a>`;
+            }
+            return `[![${item.name}](${item.url.replaceAll("/media/", "/thumbnail/") || item.image_url?.url})](${item.url || item.image_url?.url})`;
+        }).join("\n");
+    }
+    let html = window.sanitizeHtml ? content : escHtml(content);
     html = html.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) =>
       `<pre class="code-block"><div class="code-lang">${lang || 'code'}</div><code>${code.trim()}</code><button class="copy-code-btn" onclick="navigator.clipboard.writeText(this.previousElementSibling.textContent)">Copy</button></pre>`
     );
     html = html.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
+    html = html.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
+    html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1">');
+    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
     html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
     html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
     html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
@@ -256,6 +299,18 @@ const Components = (() => {
     html = html.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
     html = html.replace(/\n\n/g, '</p><p>');
     html = html.replace(/\n/g, '<br>');
+    html = html
+        .replaceAll("<a href=", '<a target="_blank" href=')
+        .replaceAll('<code>', '<code class="language-plaintext">')
+        .replaceAll('<iframe src="', '<iframe frameborder="0" height="224" width="400" src="')
+        .replaceAll('<iframe type="text/html" src="', '<iframe type="text/html" frameborder="0" allow="fullscreen" height="224" width="400" src="')
+        .replaceAll('"></iframe>', `?enablejsapi=1"></iframe>`)
+        .replaceAll('src="/media/', `src="${framework.backendUrl}/media/`)
+        .replaceAll('src="/thumbnail/', `src="${framework.backendUrl}/thumbnail/`)
+        .replaceAll('href="/media/', `src="${framework.backendUrl}/media/`)
+    if (window.sanitizeHtml) {
+        html = window.sanitizeHtml(html, sanitizedConfig());
+    }
     return `<p>${html}</p>`;
   }
 

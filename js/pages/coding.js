@@ -73,9 +73,11 @@ const CodingPage = (() => {
 
     EditorPanel.init(document.getElementById('coding-editor-pane'));
 
-    const chats = Store.getChats().filter(c => c.type === 'coding');
-    if (chats.length > 0) loadChat(chats[0].id);
-    else newChat();
+    Store.getChats().then(chats => {
+      const codingChats = chats.filter(c => c.type === 'coding');
+      if (codingChats.length > 0) loadChat(codingChats[0].id);
+      else newChat();
+    });
   }
 
   function toggleSidebar() {
@@ -111,25 +113,27 @@ const CodingPage = (() => {
     const list = (sidebar || document.getElementById('code-sidebar'))?.querySelector('#code-list');
     if (!list) return;
     list.innerHTML = '';
-    const chats = Store.getChats().filter(c => c.type === 'coding');
-    if (chats.length === 0) {
-      list.innerHTML = '<div style="padding:16px;color:var(--text2);font-size:13px">No coding sessions yet</div>';
-      return;
-    }
-    chats.forEach(chat => {
-      const item = document.createElement('div');
-      item.className = 'sidebar-item' + (chat.id === currentChatId ? ' active' : '');
-      item.innerHTML = `
-        <div style="flex:1;min-width:0">
-          <div class="item-title">${Components.escHtml(chat.title || 'Untitled')}</div>
-          <div class="item-sub">${chat.messages?.filter(m => m.role !== 'system').length || 0} messages</div>
-        </div>
-        <button class="item-del" title="Delete">✕</button>`;
-      item.addEventListener('click', e => {
-        if (e.target.classList.contains('item-del')) deleteChat(chat.id);
-        else { loadChat(chat.id); closeSidebar(); }
+    Store.getChats().then(chats => {
+      const codingChats = chats.filter(c => c.type === 'coding');
+      if (codingChats.length === 0) {
+        list.innerHTML = '<div style="padding:16px;color:var(--text2);font-size:13px">No coding sessions yet</div>';
+        return;
+      }
+      codingChats.forEach(chat => {
+        const item = document.createElement('div');
+        item.className = 'sidebar-item' + (chat.id === currentChatId ? ' active' : '');
+        item.innerHTML = `
+          <div style="flex:1;min-width:0">
+            <div class="item-title">${Components.escHtml(chat.title || 'Untitled')}</div>
+            <div class="item-sub">${chat.items?.filter(m => m.role !== 'system').length || 0} messages</div>
+          </div>
+          <button class="item-del" title="Delete">✕</button>`;
+        item.addEventListener('click', e => {
+          if (e.target.classList.contains('item-del')) deleteChat(chat.id);
+          else { loadChat(chat.id); closeSidebar(); }
+        });
+        list.appendChild(item);
       });
-      list.appendChild(item);
     });
   }
 
@@ -152,8 +156,9 @@ const CodingPage = (() => {
     titleInput.placeholder = 'Session title...';
     titleInput.addEventListener('change', () => {
       if (!currentChatId) return;
-      const chat = Store.getChat(currentChatId);
-      if (chat) { chat.title = titleInput.value; Store.upsertChat(chat); }
+      Store.getChat(currentChatId).then(chat => {
+        if (chat) { chat.title = titleInput.value; Store.upsertChat(chat); }
+      });
     });
 
     const modelSel = Components.modelSelector(Store.getActiveProvider(), currentModel);
@@ -231,8 +236,8 @@ const CodingPage = (() => {
   function newChat() {
     const id = Store.newId();
     const chat = {
-      id, type: 'coding', title: 'New Session',
-      messages: [],
+      id, type: 'coding', title: framework.translate('New Session'),
+      items: [],
       createdAt: Date.now(),
     };
     Store.upsertChat(chat);
@@ -241,26 +246,27 @@ const CodingPage = (() => {
 
   function loadChat(id) {
     currentChatId = id;
-    const chat = Store.getChat(id);
-    if (!chat) return;
-    currentModel = chat.model || Store.getActiveProvider()?.defaultModel;
+    Store.getChat(id).then(chat => {
+      if (!chat) return;
+      currentModel = chat.model || Store.getActiveProvider()?.defaultModel;
 
-    const titleInput = document.querySelector('#code-toolbar .title-input');
-    if (titleInput) titleInput.value = chat.title || '';
+      const titleInput = document.querySelector('#code-toolbar .title-input');
+      if (titleInput) titleInput.value = chat.title || '';
 
-    const modelSel = document.querySelector('#code-toolbar .model-select');
-    if (modelSel) modelSel.value = currentModel;
+      const modelSel = document.querySelector('#code-toolbar .model-select');
+      if (modelSel) modelSel.value = currentModel;
 
-    EditorPanel.reset();
+      EditorPanel.reset();
 
-    chat.messages.forEach(msg => {
-      if (msg.role === 'assistant' && msg.content) {
-        EditorPanel.applyEditsFromContent(msg.content);
-        EditorPanel.addFilesFromContent(msg.content);
-      }
+      chat.items.forEach(msg => {
+        if (msg.role === 'assistant' && msg.content) {
+          EditorPanel.applyEditsFromContent(msg.content);
+          EditorPanel.addFilesFromContent(msg.content);
+        }
+      });
+
+      renderMessages(chat.items);
     });
-
-    renderMessages(chat.messages);
     refreshSidebar();
   }
 
@@ -418,17 +424,17 @@ const CodingPage = (() => {
 
   async function sendMessage(text) {
     if (isStreaming || !currentChatId) return;
-    const chat = Store.getChat(currentChatId);
+    const chat = await Store.getChat(currentChatId);
     if (!chat) return;
 
     const provider = Store.getActiveProvider();
     const settings = Store.getSettings();
     const model = currentModel || provider.defaultModel;
 
-    const isFirstUserMessage = chat.messages.filter(m => m.role === 'user').length === 0;
+    const isFirstUserMessage = chat.items.filter(m => m.role === 'user').length === 0;
     const content = isFirstUserMessage ? CODING_INSTRUCTION + text : text;
     const userMsg = { id: Store.newId(), role: 'user', content, ts: Date.now() };
-    chat.messages.push(userMsg);
+    chat.items.push(userMsg);
     Store.upsertChat(chat);
 
     const displayUserMsg = Object.assign({}, userMsg, { content: text });
@@ -456,7 +462,7 @@ const CodingPage = (() => {
 
     let typingRemoved = false;
 
-    const apiMessages = buildMessagesForApi(chat.messages);
+    const apiMessages = buildMessagesForApi(chat.items);
 
     try {
       let fullContent = '';
@@ -541,8 +547,8 @@ const CodingPage = (() => {
 
     assistantEl.querySelector('[data-action="copy"]')?.addEventListener('click', () => Components.copyMessageContent(assistantMsg));
 
-    chat.messages.push(assistantMsg);
-    if (chat.title === 'New Session' && chat.messages.filter(m => m.role !== 'system').length === 2) {
+    chat.items.push(assistantMsg);
+    if (chat.title === 'New Session' && chat.items.filter(m => m.role !== 'system').length === 2) {
       chat.title = text.slice(0, 40) + (text.length > 40 ? '…' : '');
       const titleInput = document.querySelector('#code-toolbar .title-input');
       if (titleInput) titleInput.value = chat.title;
@@ -557,11 +563,12 @@ const CodingPage = (() => {
 
   function deleteMessage(msgId) {
     if (!currentChatId) return;
-    const chat = Store.getChat(currentChatId);
-    if (!chat) return;
-    chat.messages = chat.messages.filter(m => m.id !== msgId);
-    Store.upsertChat(chat);
-    renderMessages(chat.messages);
+    Store.getChat(currentChatId).then(chat => {
+      if (!chat) return;
+      chat.items = chat.items.filter(m => m.id !== msgId);
+      Store.upsertChat(chat);
+      renderMessages(chat.items);
+    });
   }
 
   async function deleteChat(id) {
@@ -569,9 +576,11 @@ const CodingPage = (() => {
     if (!ok) return;
     Store.deleteChat(id);
     if (currentChatId === id) {
-      const remaining = Store.getChats().filter(c => c.type === 'coding');
-      if (remaining.length > 0) loadChat(remaining[0].id);
-      else newChat();
+      Store.getChats().then(chats => {
+        const remaining = chats.filter(c => c.type === 'coding');
+        if (remaining.length > 0) loadChat(remaining[0].id);
+        else newChat();
+      });
     } else {
       refreshSidebar();
     }
