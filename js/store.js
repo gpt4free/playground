@@ -16,16 +16,14 @@ const Store = (() => {
       for ([key, provider] of Object.entries(data.providers)) {
         provider.id = key;
         provider.name = (provider.label || key) + (provider.tags ? ` ${provider.tags}` : '');
-        provider.baseUrl = provider.backupUrl || provider.baseUrl || `https://g4f.space/api/${key}`;
+        provider.baseUrl = provider.baseUrl || `https://g4f.space/api/${key}`;
         provider.defaultModel = data.defaultModels[key] || provider.defaultModel;
         provider.baseUrl = provider.baseUrl.replace('{model}', provider.defaultModel)
         provider.type = provider.type || 'openai';
         provider.models = provider.models || [];
         provider.fetchedModels = [];
         provider.defaultModel = data.defaultModels[key] || provider.defaultModel;
-        if (data.providerLocalStorage[key]) {
-          provider.apiKey = localStorage.getItem(data.providerLocalStorage[key]);
-        }
+        provider.localStorageKey = data.providerLocalStorage[key] || null;
       }
       delete data.providers.custom;
       Store.setProviders(Object.values(data.providers));
@@ -58,6 +56,7 @@ const Store = (() => {
       streamingEnabled: true,
       temperature: 0.7,
       maxTokens: 2048,
+      maxRetries: 2,
       theme: 'dark',
     },
   };
@@ -115,8 +114,13 @@ const Store = (() => {
     const providers = getProviders();
     const id = getActiveProviderId();
     const provider = providers.find(p => p.id === id) || providers[0];
-    if (!provider.apiKey && provider.backupUrl) {
+    if (provider.localStorageKey && localStorage.getItem(provider.localStorageKey)) {
+      provider.apiKey = localStorage.getItem(provider.localStorageKey);
+    } else if (!provider.apiKey && provider.backupUrl) {
       provider.apiKey = localStorage.getItem("session_token");
+    }
+    if (provider.apiKey && (provider.apiKey.startsWith("g4f_") || provider.apiKey.startsWith("gfs_"))) {
+      provider.baseUrl = provider.backupUrl || provider.baseUrl;
     }
     return provider;
   }
