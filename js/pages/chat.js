@@ -450,6 +450,8 @@ const ChatPage = (() => {
     const token = localStorage.getItem('session_token');
     if (token) {
       headers.Authorization = `Bearer ${token}`;
+    } else {
+      return url;
     }
     const response = await fetch(url, { method: 'GET', headers });
     if (!response.ok) {
