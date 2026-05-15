@@ -30,14 +30,14 @@ framework.translate = (text, check = false) => {
     if (stripText) {
         const startWithSpace = text.startsWith(" ");
         const endWithSpace = text.endsWith(" ");
-        if (stripText in framework.translations && framework.translations[stripText]) {
-            return (startWithSpace ? " " : "") + escapeHtml(framework.translations[stripText]) + (endWithSpace ? " " : "");
-        }
-        if (stripText && !newTranslations.includes(stripText)) {
+        if (!newTranslations.includes(stripText)) {
             newTranslations.push(stripText);
             if (check) {
                 console.log(`New snippet found: \`${stripText}\``);
             }
+        }
+        if (stripText in framework.translations && framework.translations[stripText]) {
+            return (startWithSpace ? " " : "") + escapeHtml(framework.translations[stripText]) + (endWithSpace ? " " : "");
         }
     }
     return text;
