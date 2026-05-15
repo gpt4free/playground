@@ -171,7 +171,7 @@
       return key;
     }
 
-    async function uploadToAnonDrop(content, filename) {
+    async function uploadToAnonDrop(content, filename, depth = 0) {
       const key = await getAnonDropKey();
       const formData = new FormData();
       formData.append('file', new Blob([content], { type: 'text/plain' }), filename);
@@ -185,6 +185,9 @@
       const bodyText = await response.text();
       const urlMatch = bodyText.match(/https?:\/\/[^"'<>\s]+/);
       if (!urlMatch) {
+        if (depth < 2) {
+          return await uploadToAnonDrop(content, filename, depth + 1);
+        }
         throw new Error('AnonDrop did not return a valid link');
       }
       return urlMatch[0];
