@@ -253,7 +253,7 @@
         try {
           statusEl.textContent = 'Large conversation detected. Uploading chat payload to AnonDrop...';
           const url = await uploadToAnonDrop(JSON.stringify(payload), filename);
-          shareUrl = new URL(`./open.html?url=${encodeURIComponent(url)}`, window.location.href).href;
+          shareUrl = new URL(`./open?id=${encodeURIComponent(url.split('%2F').pop())}`, window.location.href).href;
           statusEl.textContent = 'Uploaded chat payload to AnonDrop and generated share link.';
         } catch (error) {
           statusEl.textContent = `AnonDrop upload failed: ${error.message}. Sharing via open.html payload instead.`;
