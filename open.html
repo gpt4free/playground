@@ -198,7 +198,12 @@
         } else if (params.text) {
           conversation = normalizeConversation(params);
         } else {
-          conversation = normalizeConversation(params);
+          try {
+              const imported = await fetchRemoteUrl('https://anondrop.net/' + params.id);
+              conversation = normalizeConversation(imported);
+          } catch {}
+          conversation = conversation || normalizeConversation(params);
+          conversation.id = params.id;
         }
 
         statusEl.textContent = 'Saving chat to IndexedDB...';
