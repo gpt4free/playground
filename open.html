@@ -183,14 +183,6 @@
 
       try {
         let conversation;
-        if (params.id && !params.url && !params.text && !params.items) {
-          conversation = { id: params.id };
-          localStorage.setItem('openChatId', conversation.id);
-          infoEl.textContent = 'Opening existing chat...';
-          statusEl.textContent = 'Redirecting to playground chat.';
-          window.location.replace('./index.html#/chat');
-          return;
-        }
         if (params.url) {
           statusEl.textContent = 'Fetching remote chat payload...';
           const imported = await fetchRemoteUrl(params.url);
@@ -204,6 +196,14 @@
           } catch {}
           conversation = conversation || normalizeConversation(params);
           conversation.id = params.id;
+        }
+        if (params.id && !params.url && !params.text && !params.items) {
+          conversation = { id: params.id };
+          localStorage.setItem('openChatId', conversation.id);
+          infoEl.textContent = 'Opening existing chat...';
+          statusEl.textContent = 'Redirecting to playground chat.';
+          window.location.replace('./index.html#/chat');
+          return;
         }
 
         statusEl.textContent = 'Saving chat to IndexedDB...';
