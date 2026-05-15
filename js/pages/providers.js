@@ -169,19 +169,7 @@ const ProvidersPage = (() => {
       });
 
       card.querySelector('[data-action="fetch-models"]')?.addEventListener('click', async () => {
-        try {
-          Components.toast('Fetching models...', 'info');
-          const models = await API.fetchModels(Store.applyProviderConfig(provider));
-          if (window.convertModel) {
-            models.map(m => typeof m === 'string' ? {id: m} : m).forEach(convertModel);
-          }
-          provider.fetchedModels = models;
-          Store.upsertProvider(provider);
-          renderList();
-          Components.toast(`Fetched ${models.length} models`, 'success');
-        } catch (err) {
-          Components.toast(`Failed: ${err.message}`, 'error');
-        }
+        Components.updateModels(provider);
       });
 
       card.querySelector('[data-action="redetect"]')?.addEventListener('click', async () => {
@@ -287,14 +275,15 @@ const ProvidersPage = (() => {
 
         let detectedType = provider?.endpointType || 'openai';
 
+        provider = provider || {};
+        provider.baseUrl = baseUrl;
+        provider.apiKey = apiKey;
+        provider.defaultModel = defaultModel;
+
         if (isNew || baseUrl !== provider?.baseUrl || apiKey !== provider?.apiKey) {
           statusEl.innerHTML = '<span style="animation:thinkPulse 1s infinite;color:var(--accent)">⟳</span> Probing endpoint type...';
           try {
-            const checkProvider = Store.applyProviderConfig(provider);
-            checkProvider.baseUrl = baseUrl;
-            checkProvider.apiKey = apiKey;
-            checkProvider.defaultModel = defaultModel;
-            detectedType = await API.checkProvider(checkProvider);
+            detectedType = await API.checkProvider(Store.applyProviderConfig(provider));
             statusEl.innerHTML = `<span style="color:${endpointColor(detectedType)}">●</span> Detected: <strong style="color:var(--text)">${endpointLabel(detectedType)}</strong>`;
           } catch (err) {
             console.error('Detection error', err);

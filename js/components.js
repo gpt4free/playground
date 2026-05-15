@@ -359,19 +359,39 @@ const Components = (() => {
     return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
 
+  async function updateModels(provider) {
+      Components.toast('Fetching models...', 'info');
+      const models = await API.fetchModels(Store.applyProviderConfig(provider));
+      if (window.convertModel) models.forEach(convertModel);
+      provider.fetchedModels = models;
+      Store.upsertProvider(provider);
+      ProvidersPage.renderList();
+      Components.toast(`Fetched ${models.length} models`, 'success');
+      return models;
+  }
+
   function modelSelector(provider, currentModel) {
-    const models = provider?.fetchedModels?.length
+    function setModels(sel, models, defaultModel) {
+      models.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m.id || m;
+        opt.textContent = m.label || m.id || m;
+        if ((m.id || m) === (currentModel || defaultModel)) opt.selected = true;
+        sel.appendChild(opt);
+      });
+    }
+    const models = (provider?.fetchedModels?.length
       ? provider.fetchedModels
-      : (provider?.models?.length ? provider.models : [provider?.defaultModel || 'llama-4-scout']);
+      : (provider?.models?.length ? provider.models : null)) || [];
     const sel = document.createElement('select');
     sel.className = 'model-select';
-    models.forEach(m => {
-      const opt = document.createElement('option');
-      opt.value = m.id || m;
-      opt.textContent = m.label || m.id || m;
-      if ((m.id || m) === (currentModel || provider?.defaultModel)) opt.selected = true;
-      sel.appendChild(opt);
-    });
+    if (models.length === 0) {
+      updateModels(provider).then(newModels => {
+        setModels(sel, newModels, provider?.defaultModel);
+      });
+    } else {
+      setModels(sel, models, provider?.defaultModel);
+    }
     return sel;
   }
 
@@ -597,5 +617,5 @@ const Components = (() => {
     document.head.appendChild(style);
   }
 
-  return { toast, modal, confirm, renderMessage, renderMarkdown, escHtml, modelSelector, chatInputBar, injectStyles, renderThinkingBlock, updateThinkingBlock, addTypingIndicator, removeTypingIndicator, createImageWithLoader, copyMessageContent, formatToolCalls };
+  return { toast, modal, confirm, renderMessage, renderMarkdown, escHtml, modelSelector, chatInputBar, injectStyles, renderThinkingBlock, updateThinkingBlock, addTypingIndicator, removeTypingIndicator, createImageWithLoader, copyMessageContent, formatToolCalls, updateModels };
 })();

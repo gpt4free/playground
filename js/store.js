@@ -25,6 +25,9 @@ const Store = (() => {
         provider.defaultModel = data.defaultModels[key] || provider.defaultModel;
         provider.localStorageKey = data.providerLocalStorage[key] || null;
         provider.checkUrl = data.checkUrls[key] || null;
+        if (provider.localStorageKey && localStorage.getItem(provider.localStorageKey)) {
+          provider.apiKey = localStorage.getItem(provider.localStorageKey);
+        }
       }
       delete data.providers.custom;
       Store.setProviders(Object.values(data.providers));
@@ -110,9 +113,6 @@ const Store = (() => {
 
   function applyProviderConfig(provider) {
     const copy = {...provider};
-    if (provider.localStorageKey && localStorage.getItem(provider.localStorageKey)) {
-      copy.apiKey = localStorage.getItem(provider.localStorageKey);
-    }
     if (!copy.apiKey && provider.backupUrl) {
       copy.apiKey = localStorage.getItem("session_token");
       copy.isNotProviderKey = true;
@@ -124,19 +124,7 @@ const Store = (() => {
   }
 
   function getProviders() {
-    const providers = get('providers');
-    providers.forEach(provider => {
-      if (provider.localStorageKey && localStorage.getItem(provider.localStorageKey)) {
-        provider.apiKey = localStorage.getItem(provider.localStorageKey);
-      }
-      if (provider.apiKey && (provider.apiKey.startsWith("g4f_") || provider.apiKey.startsWith("gfs_"))) {
-        provider.baseUrl = provider.backupUrl || provider.baseUrl;
-      }
-      if (!provider.apiKey && provider.baseUrl && provider.baseUrl.startsWith("https://g4f.space/")) {
-        provider.apiKey = localStorage.getItem("session_token");
-      }
-    });
-    return providers;
+    return get('providers');
   }
   function setProviders(v) { set('providers', v); }
 
