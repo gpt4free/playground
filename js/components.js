@@ -364,6 +364,7 @@ const Components = (() => {
       const models = await API.fetchModels(Store.applyProviderConfig(provider));
       if (window.convertModel) models.forEach(convertModel);
       provider.fetchedModels = models;
+      provider.defaultModel = provider.defaultModel || models[0]?.id;
       Store.upsertProvider(provider);
       ProvidersPage.renderList();
       Components.toast(`Fetched ${models.length} models`, 'success');
