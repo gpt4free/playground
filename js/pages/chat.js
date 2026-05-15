@@ -445,7 +445,7 @@ const ChatPage = (() => {
   async function fetchAudioUrl(text) {
     const payload = text.trim().slice(0, 1000);
     if (!payload) throw new Error('No text to play');
-    const url = `https://g4f.space/audio/${encodeURIComponent(payload)}`;
+    const url = `https://g4f.space/ai/audio/${encodeURIComponent(payload)}`;
     const headers = {};
     const token = localStorage.getItem('session_token');
     if (token) {
