@@ -397,7 +397,9 @@ const API = (() => {
       }
       if (chunk.tool_use) {
         yield { type: 'tool_calls', tool_calls: [{
-            type: 'function', function: {
+            id: chunk.id,
+            type: 'function',
+            function: {
                 name: chunk.name,
                 arguments: chunk.input
             }
