@@ -107,6 +107,11 @@ const Store = (() => {
     localStorage.setItem(KEYS[key], JSON.stringify(value));
   }
 
+  function setDefault(key, value) {
+    if (localStorage.getItem(KEYS[key])) return;
+    localStorage.setItem(KEYS[key], JSON.stringify(value));
+  }
+
   function deleteSettings() {
     localStorage.removeItem(KEYS['settings']);
   }
@@ -280,6 +285,6 @@ const Store = (() => {
     getPersonas, setPersonas, upsertPersona, deletePersona,
     getChats, getChat, upsertChat, deleteChat, getLastChat,
     getSettings, setSettings, updateSettings, deleteSettings,
-    newId, loadProviders, applyProviderConfig
+    newId, loadProviders, applyProviderConfig, setDefault
   };
 })();

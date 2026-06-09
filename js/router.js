@@ -121,7 +121,9 @@ const Router = (() => {
   function init() {
     initHamburger();
     window.addEventListener('hashchange', navigate);
-    PlaygroundAuth.init().finally(() => navigate());
+    PlaygroundAuth.init().then(() => {
+      if (!PlaygroundAuth.getUser()) PlaygroundAuth.showLoginModal();
+    }).finally(() => navigate());
   }
 
   return { init, navigate };
@@ -178,40 +180,23 @@ const PlaygroundAuth = (() => {
   }
 
   function applyAuthResult(sessionToken, user) {
+    console.log('Applying auth result:', { sessionToken, user });
     if (sessionToken) {
       localStorage.setItem('session_token', sessionToken);
     }
     if (user?.pollinations?.api_key) {
+      Store.setDefault('activeProvider', 'pollinations');
       setProviderApiKey('pollinations', user.pollinations.api_key);
     }
-    if (user?.provider === 'huggingface' && user?.access_token) {
-      setProviderApiKey('huggingface', user.access_token);
+    if (user?.huggingface?.access_token) {
+      Store.setDefault('activeProvider', 'huggingface');
+      setProviderApiKey('huggingface', user.huggingface.access_token);
     }
     if (user?.airforce?.access_token) {
+      Store.setDefault('activeProvider', 'api.airforce');
       setProviderApiKey('api.airforce', user.airforce.access_token);
     }
     setUser(user || getUser());
-  }
-
-  async function handlePollinationsHash(pollinationsToken) {
-    if (!pollinationsToken) return false;
-    setProviderApiKey('pollinations', pollinationsToken);
-    try {
-      const authResponse = await fetch(`${AUTH_BASE}/members/auth/pollinations`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ api_key: pollinationsToken })
-      });
-      if (authResponse.ok) {
-        const data = await authResponse.json();
-        if (data.session && data.user) {
-          applyAuthResult(data.session, data.user);
-        }
-      }
-    } catch (e) {
-      console.warn('Pollinations account login failed, key stored locally.', e);
-    }
-    return true;
   }
 
   async function handleRedirectCallback() {
@@ -233,11 +218,6 @@ const PlaygroundAuth = (() => {
       }
       applyAuthResult(sessionToken, user);
       handled = true;
-    }
-
-    if (hash.startsWith('#api_key=')) {
-      const pollinationsToken = hash.substring(9);
-      handled = (await handlePollinationsHash(pollinationsToken)) || handled;
     }
 
     if (handled) {
@@ -311,12 +291,54 @@ const PlaygroundAuth = (() => {
     await handleRedirectCallback();
     await refreshSession();
   }
-  
+
+  function showLoginModal() {
+    const isLLMPlayground = document.location.hostname === 'llmplayground.net';
+    const providers = isLLMPlayground
+      ? [{ id: 'airforce', label: 'Airforce' }]
+      : [
+          { id: 'github', label: 'GitHub' },
+          { id: 'discord', label: 'Discord' },
+          { id: 'huggingface', label: 'HuggingFace' },
+          { id: 'pollinations', label: 'Pollinations' },
+          { id: 'airforce', label: 'Airforce' },
+        ];
+
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.id = 'login-modal-overlay';
+
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+
+    modal.innerHTML = `
+      <h2 style="margin-bottom:8px">${framework.translate('Sign in to LLMPlayground')}</h2>
+      <p style="font-size:13px;color:var(--text2);margin-bottom:16px;line-height:1.5">${framework.translate('Sign in to unlock member access tokens, provider API keys, and higher usage limits.')}</p>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        ${providers.map(p => `<button class="btn btn-secondary" data-auth-provider="${p.id}">${p.label}</button>`).join('')}
+      </div>
+      <button class="btn btn-secondary" id="login-modal-skip" style="margin-top:12px;width:100%;color:var(--text2)">${framework.translate('Continue as guest')}</button>
+    `;
+
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+
+    modal.querySelectorAll('[data-auth-provider]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        overlay.remove();
+        login(btn.dataset.authProvider);
+      });
+    });
+
+    modal.querySelector('#login-modal-skip').addEventListener('click', () => overlay.remove());
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  }
+
   function isApiKeyToken(token) {
     return token.startsWith(API_KEY_PREFIX);
   }
 
-  return { init, getUser, login, logout, refreshSession };
+  return { init, getUser, login, logout, refreshSession, showLoginModal };
 })();
 
 window.PlaygroundAuth = PlaygroundAuth;

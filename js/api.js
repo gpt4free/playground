@@ -578,7 +578,13 @@ const API = (() => {
         break;
       }
     }
-    return assistantFiltered.map(m => ({ role: m.role, content: m.content, tool_calls: m.tool_calls, name: m.name }));
+    return assistantFiltered.map(m => ({
+      role: m.role,
+      content: m.content,
+      tool_calls: m.tool_calls,
+      name: m.name,
+      tool_call_id: m.tool_call_id
+    }));
   }
 
   async function* streamChatOpenAI(provider, messages, model, options = {}) {
