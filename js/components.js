@@ -377,21 +377,15 @@ const Components = (() => {
   function modelSelector(provider, currentModel) {
     const root = document.createElement('div');
     root.className = 'model-select model-picker notranslate';
-    root.innerHTML = `
-      <button type="button" class="mp-btn"><span class="mp-label"></span><span class="mp-chev">▾</span></button>
-      <div class="mp-panel" hidden>
-        <input type="search" class="mp-search" placeholder="${framework.translate('Search models...')}">
-        <div class="mp-list" role="listbox"></div>
-      </div>`;
+    root.innerHTML = `<button type="button" class="mp-btn"><span class="mp-label"></span><span class="mp-chev">▾</span></button>`;
 
     const btn = root.querySelector('.mp-btn');
-    const panel = root.querySelector('.mp-panel');
-    const searchInput = root.querySelector('.mp-search');
-    const list = root.querySelector('.mp-list');
     const labelEl = root.querySelector('.mp-label');
 
     let models = [];
     let value = currentModel || provider?.defaultModel || '';
+    let overlay = null;
+    let rerenderList = null;
 
     function normalize(raw) {
       return (raw || [])
@@ -405,72 +399,56 @@ const Components = (() => {
       labelEl.textContent = current?.label || value || framework.translate('Select model');
     }
 
-    function renderList(filter = '') {
-      const q = filter.trim().toLowerCase();
-      const filtered = q
-        ? models.filter(m => String(m.label).toLowerCase().includes(q) || String(m.id).toLowerCase().includes(q))
-        : models;
-      list.innerHTML = filtered.length
-        ? filtered.map(m => `<button type="button" class="mp-item${m.id === value ? ' selected' : ''}" data-id="${escHtml(m.id)}">${escHtml(m.label)}</button>`).join('')
-        : `<div class="mp-empty">${framework.translate('No models found')}</div>`;
-    }
-
-    function positionPanel() {
-      const r = btn.getBoundingClientRect();
-      const width = Math.min(Math.max(r.width, 280), window.innerWidth * 0.92, 380);
-      panel.style.width = width + 'px';
-      panel.style.left = Math.max(8, Math.min(r.left, window.innerWidth - width - 8)) + 'px';
-      const spaceBelow = window.innerHeight - r.bottom;
-      if (spaceBelow < 340 && r.top > spaceBelow) {
-        panel.style.top = 'auto';
-        panel.style.bottom = (window.innerHeight - r.top + 6) + 'px';
-      } else {
-        panel.style.bottom = 'auto';
-        panel.style.top = (r.bottom + 6) + 'px';
-      }
+    function close() {
+      overlay?.remove();
+      overlay = null;
+      rerenderList = null;
     }
 
     function open() {
-      panel.hidden = false;
-      root.classList.add('open');
-      searchInput.value = '';
-      renderList();
-      positionPanel();
-      searchInput.focus();
-      list.querySelector('.mp-item.selected')?.scrollIntoView({ block: 'center' });
-    }
+      overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      overlay.innerHTML = `
+        <div class="modal mp-modal">
+          <input type="search" class="mp-search" placeholder="${framework.translate('Search models...')}">
+          <div class="mp-list" role="listbox"></div>
+        </div>`;
+      const searchInput = overlay.querySelector('.mp-search');
+      const list = overlay.querySelector('.mp-list');
 
-    function close() {
-      panel.hidden = true;
-      root.classList.remove('open');
-    }
-
-    btn.addEventListener('click', () => { panel.hidden ? open() : close(); });
-    searchInput.addEventListener('input', () => renderList(searchInput.value));
-    searchInput.addEventListener('keydown', e => {
-      if (e.key === 'Escape') { close(); btn.focus(); }
-      if (e.key === 'Enter') { e.preventDefault(); list.querySelector('.mp-item')?.click(); }
-    });
-    list.addEventListener('click', e => {
-      const item = e.target.closest('.mp-item');
-      if (!item) return;
-      value = item.dataset.id;
-      updateLabel();
-      close();
-      root.dispatchEvent(new Event('change'));
-    });
-
-    const onOutside = e => {
-      if (!root.isConnected) {
-        document.removeEventListener('pointerdown', onOutside);
-        window.removeEventListener('resize', onResize);
-        return;
+      function renderList(filter = '') {
+        const q = filter.trim().toLowerCase();
+        const filtered = q
+          ? models.filter(m => String(m.label).toLowerCase().includes(q) || String(m.id).toLowerCase().includes(q))
+          : models;
+        list.innerHTML = filtered.length
+          ? filtered.map(m => `<button type="button" class="mp-item${m.id === value ? ' selected' : ''}" data-id="${escHtml(m.id)}">${escHtml(m.label)}</button>`).join('')
+          : `<div class="mp-empty">${framework.translate('No models found')}</div>`;
       }
-      if (!panel.hidden && !root.contains(e.target)) close();
-    };
-    const onResize = () => { if (!panel.hidden) close(); };
-    document.addEventListener('pointerdown', onOutside);
-    window.addEventListener('resize', onResize);
+      rerenderList = () => renderList(searchInput.value);
+
+      overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+      searchInput.addEventListener('input', () => renderList(searchInput.value));
+      searchInput.addEventListener('keydown', e => {
+        if (e.key === 'Escape') { close(); btn.focus(); }
+        if (e.key === 'Enter') { e.preventDefault(); list.querySelector('.mp-item')?.click(); }
+      });
+      list.addEventListener('click', e => {
+        const item = e.target.closest('.mp-item');
+        if (!item) return;
+        value = item.dataset.id;
+        updateLabel();
+        close();
+        root.dispatchEvent(new Event('change'));
+      });
+
+      document.body.appendChild(overlay);
+      renderList();
+      list.querySelector('.mp-item.selected')?.scrollIntoView({ block: 'center' });
+      if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) searchInput.focus();
+    }
+
+    btn.addEventListener('click', () => { overlay ? close() : open(); });
 
     Object.defineProperty(root, 'value', {
       get: () => value,
@@ -485,7 +463,7 @@ const Components = (() => {
         models = normalize(newModels);
         if (!value) value = provider?.defaultModel || models[0]?.id || '';
         updateLabel();
-        if (!panel.hidden) renderList(searchInput.value);
+        rerenderList?.();
       }).catch(() => {});
     } else {
       models = normalize(initial);
@@ -636,10 +614,9 @@ const Components = (() => {
       .mp-btn:hover, .model-picker.open .mp-btn { border-color: var(--accent-border); }
       .mp-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
       .mp-chev { font-size: 9px; color: var(--text2); flex-shrink: 0; }
-      .mp-panel { position: fixed; z-index: 1200; background: var(--bg2); border: 1px solid var(--border2); border-radius: var(--radius); box-shadow: var(--shadow); display: flex; flex-direction: column; overflow: hidden; }
-      .mp-panel[hidden] { display: none; }
-      .mp-search { margin: 8px; padding: 9px 12px; flex-shrink: 0; }
-      .mp-list { overflow-y: auto; max-height: min(46vh, 340px); padding: 0 6px 8px; display: flex; flex-direction: column; gap: 1px; }
+      .mp-modal { display: flex; flex-direction: column; gap: 10px; padding: 14px; overflow: hidden; }
+      .mp-search { padding: 10px 14px; flex-shrink: 0; width: 100%; }
+      .mp-list { overflow-y: auto; max-height: min(58vh, 460px); display: flex; flex-direction: column; gap: 1px; }
       .mp-item { text-align: left; background: none; border: none; color: var(--text); padding: 9px 10px; border-radius: 8px; font-size: 13px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; }
       .mp-item:hover { background: var(--bg3); }
       .mp-item.selected { background: var(--accent-soft); color: var(--accent); }
