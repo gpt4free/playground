@@ -135,15 +135,10 @@ const PlaygroundAuth = (() => {
   const DEFAULT_ACCOUNT_NAME = 'Account';
   const API_KEY_PREFIX = 'g4f_';
 
-  const AIRFORCE_BASE = 'https://api.airforce';
-  const AIRFORCE_CLIENT_ID = localStorage.getItem('airforce_client_id') || 'airforce_llmplayground';
-  const AIRFORCE_SCOPES = 'profile chat images';
   const AIRFORCE_PROVIDER_ID = 'api.airforce';
   const AIRFORCE_TOKEN_KEY = 'airforce_token';
   const AIRFORCE_EXPIRES_KEY = 'airforce_expires';
   const AIRFORCE_USER_KEY = 'airforce_user';
-  const AIRFORCE_PKCE_KEY = 'airforce_pkce_verifier';
-  const AIRFORCE_STATE_KEY = 'airforce_oauth_state';
 
   function getUser() {
     const expires = localStorage.getItem(EXPIRES_KEY);
@@ -249,166 +244,11 @@ const PlaygroundAuth = (() => {
     Store.upsertProvider(provider);
   }
 
-  function randomUrlSafeString(length) {
-    const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
-    const bytes = new Uint8Array(length);
-    crypto.getRandomValues(bytes);
-    return Array.from(bytes, b => charset[b % charset.length]).join('');
-  }
-
-  function base64UrlNoPad(buffer) {
-    return btoa(String.fromCharCode(...new Uint8Array(buffer)))
-      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  }
-
-  function getAirforceRedirectUri() {
-    return window.location.origin + window.location.pathname;
-  }
-
-  function getAirforceToken() {
-    const token = localStorage.getItem(AIRFORCE_TOKEN_KEY);
-    if (!token) return null;
-    if (isTokenExpired(localStorage.getItem(AIRFORCE_EXPIRES_KEY))) {
-      clearAirforce();
-      return null;
-    }
-    return token;
-  }
-
   function clearAirforce() {
     localStorage.removeItem(AIRFORCE_TOKEN_KEY);
     localStorage.removeItem(AIRFORCE_EXPIRES_KEY);
     localStorage.removeItem(AIRFORCE_USER_KEY);
     clearProviderApiKey(AIRFORCE_PROVIDER_ID);
-  }
-
-  async function loginAirforce() {
-    const verifier = randomUrlSafeString(64);
-    const state = randomUrlSafeString(32);
-    sessionStorage.setItem(AIRFORCE_PKCE_KEY, verifier);
-    sessionStorage.setItem(AIRFORCE_STATE_KEY, state);
-    const challenge = base64UrlNoPad(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)));
-    const params = new URLSearchParams({
-      response_type: 'code',
-      client_id: AIRFORCE_CLIENT_ID,
-      redirect_uri: getAirforceRedirectUri(),
-      scope: AIRFORCE_SCOPES,
-      state,
-      code_challenge: challenge,
-      code_challenge_method: 'S256',
-    });
-    window.location.href = `${AIRFORCE_BASE}/oauth/authorize?${params.toString()}`;
-  }
-
-  function airforceUserFromInfo(info) {
-    return {
-      name: info?.username || DEFAULT_ACCOUNT_NAME,
-      username: info?.username || DEFAULT_ACCOUNT_NAME,
-      tier: info?.plan || 'free',
-      email: info?.email,
-      provider: 'airforce',
-    };
-  }
-
-  async function fetchAirforceUserinfo(token) {
-    const res = await fetch(`${AIRFORCE_BASE}/oauth/userinfo`, {
-      headers: { 'Authorization': `Bearer ${token}` },
-    });
-    if (res.status === 401) {
-      clearAirforce();
-      throw Object.assign(new Error('Unauthorized'), { status: 401 });
-    }
-    if (!res.ok) throw new Error(`userinfo failed (${res.status})`);
-    return res.json();
-  }
-
-  async function refreshAirforceModels() {
-    try {
-      const provider = Store.getProviders().find(p => p.id === AIRFORCE_PROVIDER_ID);
-      if (!provider) return;
-      const models = await API.fetchModels(Store.applyProviderConfig(provider));
-      if (models.length > 0) {
-        provider.fetchedModels = models;
-        if (!provider.defaultModel) provider.defaultModel = models[0].id || models[0];
-        Store.upsertProvider(provider);
-      }
-    } catch (e) {
-      console.warn('Failed to refresh Airforce models:', e);
-    }
-  }
-
-  async function applyAirforceAuth(accessToken, expiresAt) {
-    localStorage.setItem(AIRFORCE_TOKEN_KEY, accessToken);
-    localStorage.setItem(AIRFORCE_EXPIRES_KEY, expiresAt);
-
-    let info = null;
-    try {
-      info = await fetchAirforceUserinfo(accessToken);
-    } catch (e) {
-      if (e.status === 401) throw e;
-      console.warn('Airforce userinfo failed:', e);
-    }
-    const user = airforceUserFromInfo(info);
-    localStorage.setItem(AIRFORCE_USER_KEY, JSON.stringify(user));
-
-    setProviderApiKey(AIRFORCE_PROVIDER_ID, accessToken, expiresAt);
-    Store.setActiveProviderId(AIRFORCE_PROVIDER_ID);
-    setUser(user, expiresAt);
-    await refreshAirforceModels();
-  }
-
-  async function handleAirforceCallback() {
-    const query = new URLSearchParams(window.location.search);
-    const code = query.get('code');
-    const error = query.get('error');
-    if (!code && !error) return false;
-
-    const expectedState = sessionStorage.getItem(AIRFORCE_STATE_KEY);
-    const verifier = sessionStorage.getItem(AIRFORCE_PKCE_KEY);
-    if (!verifier || !expectedState) return false;
-    sessionStorage.removeItem(AIRFORCE_STATE_KEY);
-    sessionStorage.removeItem(AIRFORCE_PKCE_KEY);
-
-    const cleanUrl = () => window.history.replaceState({}, document.title, `${window.location.pathname}#/providers`);
-    const toast = (msg, kind) => { if (typeof Components !== 'undefined') Components.toast(msg, kind); };
-
-    if (error) {
-      cleanUrl();
-      toast(error === 'access_denied' ? 'Airforce sign-in was denied' : `Airforce sign-in failed: ${error}`, 'error');
-      return true;
-    }
-    if (query.get('state') !== expectedState) {
-      cleanUrl();
-      toast('Airforce sign-in failed: state mismatch', 'error');
-      return true;
-    }
-
-    try {
-      const res = await fetch(`${AIRFORCE_BASE}/oauth/token`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          grant_type: 'authorization_code',
-          client_id: AIRFORCE_CLIENT_ID,
-          code,
-          redirect_uri: getAirforceRedirectUri(),
-          code_verifier: verifier,
-        }),
-      });
-      if (!res.ok) {
-        const body = await res.text();
-        throw new Error(`token exchange failed (${res.status}): ${body}`);
-      }
-      const data = await res.json();
-      const expiresAt = Date.now() + (data.expires_in || 86400) * 1000;
-      await applyAirforceAuth(data.access_token, expiresAt);
-      toast('Signed in with Airforce', 'success');
-    } catch (err) {
-      console.error('Airforce OAuth error:', err);
-      toast('Airforce sign-in failed. Please try again.', 'error');
-    }
-    cleanUrl();
-    return true;
   }
 
   function applyAuthResult(sessionToken, user, expires) {
@@ -438,8 +278,6 @@ const PlaygroundAuth = (() => {
   }
 
   async function handleRedirectCallback() {
-    if (await handleAirforceCallback()) return true;
-
     const hash = window.location.hash || '';
     const decodedHash = hash ? decodeURIComponent(hash.substring(1)) : '';
     const hashParams = new URLSearchParams(decodedHash);
@@ -468,28 +306,6 @@ const PlaygroundAuth = (() => {
   }
 
   async function refreshSession() {
-    const airforceToken = getAirforceToken();
-    if (airforceToken) {
-      try {
-        const info = await fetchAirforceUserinfo(airforceToken);
-        const user = airforceUserFromInfo(info);
-        localStorage.setItem(AIRFORCE_USER_KEY, JSON.stringify(user));
-        const expires = parseInt(localStorage.getItem(AIRFORCE_EXPIRES_KEY)) || undefined;
-        setProviderApiKey(AIRFORCE_PROVIDER_ID, airforceToken, expires);
-        Store.setDefault('activeProvider', AIRFORCE_PROVIDER_ID);
-        setUser(user, expires);
-        return;
-      } catch (e) {
-        if (e.status === 401) {
-          setUser(null);
-          return;
-        }
-        console.error('Error refreshing Airforce session:', e);
-        updateAuthButton(getUser());
-        return;
-      }
-    }
-
     const token = localStorage.getItem("g4f_session");
     if (!token) {
       setUser(null);
@@ -522,9 +338,6 @@ const PlaygroundAuth = (() => {
   }
 
   async function login(provider) {
-    if (provider === 'airforce') {
-      return loginAirforce();
-    }
     if (provider === 'pollinations') {
       const params = new URLSearchParams({
         redirect: getCurrentUrl(),
@@ -537,20 +350,7 @@ const PlaygroundAuth = (() => {
   }
 
   async function logout() {
-    const airforceToken = localStorage.getItem(AIRFORCE_TOKEN_KEY);
-    if (airforceToken) {
-      try {
-        await fetch(`${AIRFORCE_BASE}/oauth/revoke`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: new URLSearchParams({ token: airforceToken }),
-        });
-      } catch (e) {
-        console.warn('Airforce token revoke failed:', e);
-      }
-      clearAirforce();
-    }
-
+    clearAirforce();
     const token = localStorage.getItem("g4f_session");
     if (token) {
       try {
@@ -618,7 +418,7 @@ const PlaygroundAuth = (() => {
     return token.startsWith(API_KEY_PREFIX);
   }
 
-  return { init, getUser, login, logout, refreshSession, showLoginModal, getAirforceToken, clearAirforce };
+  return { init, getUser, login, logout, refreshSession, showLoginModal, clearAirforce };
 })();
 
 window.PlaygroundAuth = PlaygroundAuth;

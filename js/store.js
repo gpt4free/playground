@@ -130,13 +130,6 @@ const Store = (() => {
     if (copy.apiKeyExpires && isTokenExpired(copy.apiKeyExpires)) {
       copy.apiKey = '';
     }
-    const isAirforce = copy.id === 'api.airforce' || (copy.baseUrl || '').startsWith('https://api.airforce');
-    if (isAirforce && !copy.apiKey) {
-      const airforceToken = localStorage.getItem('airforce_token');
-      if (airforceToken && !isTokenExpired(localStorage.getItem('airforce_expires'))) {
-        copy.apiKey = airforceToken;
-      }
-    }
     if (!copy.apiKey && provider.backupUrl) {
       copy.apiKey = localStorage.getItem("g4f_session");
       copy.isNotProviderKey = true;
