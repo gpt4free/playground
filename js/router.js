@@ -131,7 +131,7 @@ const Router = (() => {
 
 const PlaygroundAuth = (() => {
   const AUTH_BASE = 'https://auth.g4f.space';
-  const USER_KEY = 'llmp_user';
+  const USER_KEY = 'g4f_user';
   const SESSION_KEY = 'g4f_session';
   const EXPIRES_KEY = 'g4f_expires';
   const DEFAULT_ACCOUNT_NAME = 'Account';
@@ -139,7 +139,7 @@ const PlaygroundAuth = (() => {
 
   function getUser() {
     const expires = localStorage.getItem(EXPIRES_KEY);
-    if (expires && isTokenExpired(expires)) {
+    if (isTokenExpired(expires)) {
       localStorage.removeItem(USER_KEY);
       localStorage.removeItem(EXPIRES_KEY);
       localStorage.removeItem(SESSION_KEY);
@@ -169,10 +169,19 @@ const PlaygroundAuth = (() => {
   function updateAuthButton(user = getUser()) {
     const btn = document.getElementById('auth-status-btn');
     if (!btn) return;
+    btn.removeAttribute("style");
     if (user) {
       const name = user.name || user.username || 'Account';
       const tier = user.tier || 'free';
-      btn.textContent = `${name} · ${tier}`;
+      if (user.avatar) {
+        btn.style.backgroundImage = `url(${user.avatar})`;
+        btn.style.backgroundSize = 'contain';
+        btn.style.backgroundRepeat = 'no-repeat';
+        btn.style.paddingLeft = '24px';
+        btn.textContent = tier;
+      } else {
+        btn.textContent = `${name} · ${tier}`;
+      }
       btn.title = `Logged in (${tier})`;
     } else {
       btn.textContent = 'Login';
