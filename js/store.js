@@ -31,7 +31,7 @@ const Store = (() => {
       }
       delete data.providers.custom;
       Store.setProviders(Object.values(data.providers));
-      Store.setActiveProviderId(document.location.hostname === 'llmplayground.net' ? 'api.airforce' : Object.keys(data.providers)[0]);
+      Store.setActiveProviderId(data.providers['api.airforce'] ? 'api.airforce' : Object.keys(data.providers)[0]);
       ProvidersPage.renderList();
     });
   }
@@ -126,6 +126,16 @@ const Store = (() => {
     const copy = {...provider};
     if (copy.expires && isTokenExpired(copy.expires)) {
       copy.apiKey = '';
+    }
+    if (copy.apiKeyExpires && isTokenExpired(copy.apiKeyExpires)) {
+      copy.apiKey = '';
+    }
+    const isAirforce = copy.id === 'api.airforce' || (copy.baseUrl || '').startsWith('https://api.airforce');
+    if (isAirforce && !copy.apiKey) {
+      const airforceToken = localStorage.getItem('airforce_token');
+      if (airforceToken && !isTokenExpired(localStorage.getItem('airforce_expires'))) {
+        copy.apiKey = airforceToken;
+      }
     }
     if (!copy.apiKey && provider.backupUrl) {
       copy.apiKey = localStorage.getItem("g4f_session");

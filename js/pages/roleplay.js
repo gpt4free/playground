@@ -112,7 +112,7 @@ const RoleplayPage = (() => {
     });
 
     const personaSel = document.createElement('select');
-    personaSel.className = 'model-select';
+    personaSel.className = 'model-select notranslate';
     personaSel.id = 'rp-persona-sel';
     personaSel.addEventListener('change', () => {
       currentPersonaId = personaSel.value || null;
@@ -183,7 +183,7 @@ const RoleplayPage = (() => {
       const personaSel = document.getElementById('rp-persona-sel');
       if (personaSel) personaSel.value = currentPersonaId || '';
 
-      const modelSel = document.querySelector('#rp-toolbar .model-select');
+      const modelSel = document.querySelector('#rp-toolbar .model-select:not(#rp-persona-sel)');
       if (modelSel) modelSel.value = currentModel;
 
       renderMessages(chat.items);
@@ -202,10 +202,29 @@ const RoleplayPage = (() => {
         if (persona?.systemPrompt) {
           chat.items.unshift({ id: Store.newId(), role: 'system', content: persona.systemPrompt, ts: Date.now() });
         }
+        if (persona?.firstMessage && chat.items.filter(m => m.role !== 'system').length === 0) {
+          chat.items.push({ id: Store.newId(), role: 'assistant', content: persona.firstMessage, ts: Date.now() });
+        }
       }
       Store.upsertChat(chat);
       renderMessages(chat.items);
     });
+  }
+
+  function startWithPersona(personaId) {
+    const persona = Store.getPersonas().find(p => p.id === personaId);
+    if (!persona) return;
+    const id = Store.newId();
+    const items = [];
+    if (persona.systemPrompt) {
+      items.push({ id: Store.newId(), role: 'system', content: persona.systemPrompt, ts: Date.now() });
+    }
+    if (persona.firstMessage) {
+      items.push({ id: Store.newId(), role: 'assistant', content: persona.firstMessage, ts: Date.now() });
+    }
+    const chat = { id, type: 'roleplay', title: persona.name, items, personaId, added: Date.now() };
+    Store.upsertChat(chat);
+    if (document.getElementById('rp-main')) loadChat(id);
   }
 
   function renderMessages(messages) {
@@ -215,9 +234,12 @@ const RoleplayPage = (() => {
     const persona = currentPersonaId ? Store.getPersonas().find(p => p.id === currentPersonaId) : null;
     const visible = messages.filter(m => m.role !== 'system');
     if (visible.length === 0) {
+      const avatarHtml = persona?.avatar
+        ? `<img src="${Components.escHtml(persona.avatar)}" alt="" style="width:80px;height:80px;border-radius:50%;object-fit:cover" onerror="this.outerHTML='<div class=&quot;big&quot;>🎭</div>'">`
+        : `<div class="big">${persona?.emoji || '🎭'}</div>`;
       const hint = persona
-        ? `<div class="big">${persona.emoji || '🎭'}</div><h2>${Components.escHtml(persona.name)}</h2><p>${Components.escHtml(persona.description || 'Start the roleplay below')}</p>`
-        : `<div class="big">🎭</div><h2>Roleplay</h2><p>Select a persona and start chatting</p>`;
+        ? `${avatarHtml}<h2 class="notranslate">${Components.escHtml(persona.name)}</h2><p>${Components.escHtml(persona.description || 'Start the roleplay below')}</p>`
+        : `<div class="big">🎭</div><h2>Roleplay</h2><p>${framework.translate('Select a persona or browse the character library')}</p><a href="#/characters" class="btn btn-primary" style="margin-top:12px;display:inline-block;text-decoration:none">${framework.translate('Browse Characters')}</a>`;
       wrap.innerHTML = `<div class="empty-state">${hint}</div>`;
       return;
     }
@@ -225,6 +247,7 @@ const RoleplayPage = (() => {
       const el = Components.renderMessage(msg, {
         personaName: persona?.name || framework.translate('Assistant'),
         personaEmoji: persona?.emoji || '🤖',
+        personaAvatar: persona?.avatar || '',
         deletable: true,
       });
       el.querySelector('[data-action="delete"]')?.addEventListener('click', () => deleteMessage(msg.id));
@@ -273,6 +296,7 @@ const RoleplayPage = (() => {
     const assistantEl = Components.renderMessage(assistantMsg, {
       personaName: persona?.name || framework.translate('Assistant'),
       personaEmoji: persona?.emoji || '🤖',
+      personaAvatar: persona?.avatar || '',
     });
     const contentEl = assistantEl.querySelector('.msg-content');
     Components.addTypingIndicator(assistantEl);
@@ -404,5 +428,5 @@ const RoleplayPage = (() => {
     }
   }
 
-  return { render };
+  return { render, startWithPersona };
 })();

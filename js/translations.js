@@ -3,8 +3,6 @@ framework.backendUrl = "";
 
 let newTranslations = [];
 
-// Pre-populate newTranslations from snippets.json so translateAll() covers
-// strings that may not have been rendered yet.
 fetch('js/snippets.json')
     .then(r => r.json())
     .then(snippets => {

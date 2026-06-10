@@ -60,7 +60,7 @@ const ProvidersPage = (() => {
     section.innerHTML = `
       <h2 style="font-size:15px;margin-bottom:8px">Account</h2>
       <div class="notranslate" style="font-size:13px;color:var(--text2);margin-bottom:12px">
-        ${user ? `${framework.translate('Signed in as')} <strong style="color:var(--text)">${Components.escHtml(accountName)}</strong> · ${framework.translate('Tier')}: <strong style="color:var(--text)">${Components.escHtml(tier)}</strong>` : `${framework.translate('Sign in to use your members access token and provider API keys.')}`}
+        ${user ? `${framework.translate('Signed in as')} <strong style="color:var(--text)">${Components.escHtml(accountName)}</strong> · ${framework.translate(user.provider === 'airforce' ? 'Plan' : 'Tier')}: <strong style="color:var(--text)">${Components.escHtml(tier)}</strong>${user.provider === 'airforce' ? `<br>${framework.translate('Requests to Airforce API are billed to your account plan.')}` : ''}` : `${framework.translate('Sign in with Airforce to use the models in your plan, or use member access tokens and provider API keys.')}`}
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         ${user ? `
@@ -572,10 +572,15 @@ const ProvidersPage = (() => {
   }
 
   function updateBadge() {
-    const badge = document.getElementById('active-provider-badge');
-    if (!badge) return;
     const p = Store.getActiveProvider();
-    badge.textContent = p ? `${p.name} · ${p.defaultModel || '?'}` : 'No provider';
+    const label = p ? `${p.name} · ${p.defaultModel || '?'}` : 'No provider';
+    const badge = document.getElementById('active-provider-badge');
+    if (badge) badge.textContent = label;
+    const railBadge = document.getElementById('active-provider-badge-rail');
+    if (railBadge) {
+      railBadge.textContent = p ? (p.defaultModel || p.name) : 'No provider';
+      railBadge.title = label;
+    }
   }
 
   return { render, updateBadge, renderList };
