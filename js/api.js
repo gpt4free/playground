@@ -198,11 +198,14 @@ const API = (() => {
     ];
 
     for (const probe of probes) {
+      let result = null;
       try {
-        const result = await probe.run();
-        if (result.status === 401) throw Object.assign(new Error('Unauthorized'), { status: 401 });
-        if (result.ok) return probe.type;
-      } catch {}
+        result = await probe.run();
+      } catch {
+        continue
+      }
+      if (result.status === 401) throw Object.assign(new Error('Unauthorized'), { status: 401 });
+      if (result.ok) return probe.type;
     }
 
     return 'openai';

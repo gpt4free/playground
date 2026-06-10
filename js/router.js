@@ -132,7 +132,8 @@ const Router = (() => {
 const PlaygroundAuth = (() => {
   const AUTH_BASE = 'https://auth.g4f.space';
   const USER_KEY = 'llmp_user';
-  const EXPIRES_KEY = 'expires';
+  const SESSION_KEY = 'g4f_session';
+  const EXPIRES_KEY = 'g4f_expires';
   const DEFAULT_ACCOUNT_NAME = 'Account';
   const API_KEY_PREFIX = 'g4f_';
 
@@ -141,7 +142,7 @@ const PlaygroundAuth = (() => {
     if (expires && isTokenExpired(expires)) {
       localStorage.removeItem(USER_KEY);
       localStorage.removeItem(EXPIRES_KEY);
-      localStorage.removeItem("g4f_session");
+      localStorage.removeItem(SESSION_KEY);
       return null;
     }
     try {
@@ -214,7 +215,7 @@ const PlaygroundAuth = (() => {
   function applyAuthResult(sessionToken, user, expires) {
     console.log('Applying auth result:', { sessionToken, user, expires });
     if (sessionToken) {
-      localStorage.setItem("g4f_session", sessionToken);
+      localStorage.setItem(SESSION_KEY, sessionToken);
     }
     if (user?.pollinations?.api_key) {
       if (!isTokenExpired(user.pollinations.expires)) {

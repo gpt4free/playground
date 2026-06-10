@@ -278,11 +278,14 @@ const ProvidersPage = (() => {
         let detectedType = provider?.endpointType || 'openai';
 
         provider = provider || {};
-        provider.baseUrl = baseUrl;
-        provider.apiKey = apiKey;
         provider.defaultModel = defaultModel;
 
         if (isNew || baseUrl !== provider?.baseUrl || apiKey !== provider?.apiKey) {
+          provider.baseUrl = baseUrl;
+          if (provider.apiKey !== apiKey) {
+              provider.apiKey = apiKey;
+              delete provider.apiKeyExpires;
+          }
           statusEl.innerHTML = '<span style="animation:thinkPulse 1s infinite;color:var(--accent)">⟳</span> Probing endpoint type...';
           try {
             detectedType = await API.checkProvider(Store.applyProviderConfig(provider));
@@ -291,6 +294,8 @@ const ProvidersPage = (() => {
             console.error('Detection error', err);
             if (err.status === 401) {
               statusEl.innerHTML = `<span style="color:var(--red)">●</span> Unauthorized. API key may be invalid.`;
+              saveBtn.disabled = false;
+              saveBtn.textContent = framework.translate('Save');
               return;
             }
             statusEl.innerHTML = `<span style="color:var(--yellow)">⚠</span> ${framework.translate('Detection failed, defaulting to OpenAI')}`;
@@ -302,9 +307,6 @@ const ProvidersPage = (() => {
           id: provider?.id || Store.newId(),
           ...(provider || {}),
           name,
-          baseUrl,
-          apiKey,
-          defaultModel,
           type: detectedType,
           endpointType: detectedType,
           fetchedModels: provider?.fetchedModels || [],
@@ -315,7 +317,7 @@ const ProvidersPage = (() => {
 
         saveBtn.textContent = 'Fetching models...';
         try {
-          const models = await API.fetchModels(updated);
+          const models = await API.fetchModels(Store.applyProviderConfig(updated));
           if (models.length > 0) {
             updated.fetchedModels = models;
             if (!updated.defaultModel) updated.defaultModel = models.length > 0 ? (models[0].id || models[0]) : '';
