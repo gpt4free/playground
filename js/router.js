@@ -121,19 +121,30 @@ const Router = (() => {
   function init() {
     initHamburger();
     window.addEventListener('hashchange', navigate);
-    PlaygroundAuth.init().finally(() => navigate());
+    PlaygroundAuth.init().then(() => {
+      if (!PlaygroundAuth.getUser()) PlaygroundAuth.showLoginModal();
+    }).finally(() => navigate());
   }
 
   return { init, navigate };
 })();
 
 const PlaygroundAuth = (() => {
-  const AUTH_BASE = 'https://auth.gpt4free.workers.dev';
-  const USER_KEY = 'llmp_user';
+  const AUTH_BASE = 'https://auth.g4f.space';
+  const USER_KEY = 'g4f_user';
+  const SESSION_KEY = 'g4f_session';
+  const EXPIRES_KEY = 'g4f_expires';
   const DEFAULT_ACCOUNT_NAME = 'Account';
   const API_KEY_PREFIX = 'g4f_';
 
   function getUser() {
+    const expires = localStorage.getItem(EXPIRES_KEY);
+    if (isTokenExpired(expires)) {
+      localStorage.removeItem(USER_KEY);
+      localStorage.removeItem(EXPIRES_KEY);
+      localStorage.removeItem(SESSION_KEY);
+      return null;
+    }
     try {
       return JSON.parse(localStorage.getItem(USER_KEY) || 'null');
     } catch {
@@ -141,11 +152,15 @@ const PlaygroundAuth = (() => {
     }
   }
 
-  function setUser(user) {
+  function setUser(user, expires) {
     if (user) {
       localStorage.setItem(USER_KEY, JSON.stringify(user));
+      if (expires) {
+        localStorage.setItem(EXPIRES_KEY, expires);
+      }
     } else {
       localStorage.removeItem(USER_KEY);
+      localStorage.removeItem(EXPIRES_KEY);
     }
     window.dispatchEvent(new CustomEvent('llmp-auth-updated', { detail: { user } }));
     updateAuthButton(user);
@@ -154,10 +169,19 @@ const PlaygroundAuth = (() => {
   function updateAuthButton(user = getUser()) {
     const btn = document.getElementById('auth-status-btn');
     if (!btn) return;
+    btn.removeAttribute("style");
     if (user) {
       const name = user.name || user.username || 'Account';
       const tier = user.tier || 'free';
-      btn.textContent = `${name} · ${tier}`;
+      if (user.avatar) {
+        btn.style.backgroundImage = `url(${user.avatar})`;
+        btn.style.backgroundSize = 'contain';
+        btn.style.backgroundRepeat = 'no-repeat';
+        btn.style.paddingLeft = '24px';
+        btn.textContent = tier;
+      } else {
+        btn.textContent = `${name} · ${tier}`;
+      }
       btn.title = `Logged in (${tier})`;
     } else {
       btn.textContent = 'Login';
@@ -169,46 +193,58 @@ const PlaygroundAuth = (() => {
     return window.location.href.split('#')[0];
   }
 
-  function setProviderApiKey(providerId, apiKey) {
+  function isTokenExpired(expires) {
+    if (!expires) return false;
+    const expiresMs = expires > 1e12 ? expires : expires * 1000;
+    return Date.now() > expiresMs;
+  }
+
+  function setProviderApiKey(providerId, apiKey, expires) {
     if (!apiKey || typeof Store === 'undefined' || !Store.getProviders) return;
     const provider = Store.getProviders().find(p => p.id === providerId);
     if (!provider) return;
     provider.apiKey = apiKey;
+    if (expires) {
+      provider.apiKeyExpires = expires > 1e12 ? expires : expires * 1000;
+    } else {
+      delete provider.apiKeyExpires;
+    }
     Store.upsertProvider(provider);
   }
 
-  function applyAuthResult(sessionToken, user) {
-    if (sessionToken) {
-      localStorage.setItem('session_token', sessionToken);
-    }
-    if (user?.pollinations?.api_key) {
-      setProviderApiKey('pollinations', user.pollinations.api_key);
-    }
-    if (user?.provider === 'huggingface' && user?.access_token) {
-      setProviderApiKey('huggingface', user.access_token);
-    }
-    setUser(user || getUser());
+  function clearProviderApiKey(providerId) {
+    if (typeof Store === 'undefined' || !Store.getProviders) return;
+    const provider = Store.getProviders().find(p => p.id === providerId);
+    if (!provider) return;
+    provider.apiKey = '';
+    delete provider.apiKeyExpires;
+    Store.upsertProvider(provider);
   }
 
-  async function handlePollinationsHash(pollinationsToken) {
-    if (!pollinationsToken) return false;
-    setProviderApiKey('pollinations', pollinationsToken);
-    try {
-      const authResponse = await fetch(`${AUTH_BASE}/members/auth/pollinations`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ api_key: pollinationsToken })
-      });
-      if (authResponse.ok) {
-        const data = await authResponse.json();
-        if (data.session && data.user) {
-          applyAuthResult(data.session, data.user);
-        }
-      }
-    } catch (e) {
-      console.warn('Pollinations account login failed, key stored locally.', e);
+  function applyAuthResult(sessionToken, user, expires) {
+    console.log('Applying auth result:', { sessionToken, user, expires });
+    if (sessionToken) {
+      localStorage.setItem(SESSION_KEY, sessionToken);
     }
-    return true;
+    if (user?.pollinations?.api_key) {
+      if (!isTokenExpired(user.pollinations.expires)) {
+        Store.setDefault('activeProvider', 'pollinations');
+        setProviderApiKey('pollinations', user.pollinations.api_key, user.pollinations.expires);
+      }
+    }
+    if (user?.huggingface?.access_token) {
+      if (!isTokenExpired(user.huggingface.expires)) {
+        Store.setDefault('activeProvider', 'huggingface');
+        setProviderApiKey('huggingface', user.huggingface.access_token, user.huggingface.expires);
+      }
+    }
+    if (user?.airforce?.access_token) {
+      if (!isTokenExpired(user.airforce.expires)) {
+        Store.setDefault('activeProvider', 'api.airforce');
+        setProviderApiKey('api.airforce', user.airforce.access_token, user.airforce.expires);
+      }
+    }
+    setUser(user || getUser(), expires);
   }
 
   async function handleRedirectCallback() {
@@ -219,6 +255,7 @@ const PlaygroundAuth = (() => {
 
     const sessionToken = hashParams.get('session');
     const userParam = hashParams.get('user');
+    const expiresParam = hashParams.get('expires');
     if (sessionToken) {
       let user = getUser();
       if (userParam) {
@@ -228,13 +265,8 @@ const PlaygroundAuth = (() => {
           user = getUser();
         }
       }
-      applyAuthResult(sessionToken, user);
+      applyAuthResult(sessionToken, user, expiresParam);
       handled = true;
-    }
-
-    if (hash.startsWith('#api_key=')) {
-      const pollinationsToken = hash.substring(9);
-      handled = (await handlePollinationsHash(pollinationsToken)) || handled;
     }
 
     if (handled) {
@@ -244,7 +276,7 @@ const PlaygroundAuth = (() => {
   }
 
   async function refreshSession() {
-    const token = localStorage.getItem('session_token');
+    const token = localStorage.getItem("g4f_session");
     if (!token) {
       setUser(null);
       return;
@@ -255,7 +287,7 @@ const PlaygroundAuth = (() => {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (!response.ok) {
-        localStorage.removeItem('session_token');
+        localStorage.removeItem("g4f_session");
         setUser(null);
         return;
       }
@@ -265,9 +297,9 @@ const PlaygroundAuth = (() => {
           name: data.username || DEFAULT_ACCOUNT_NAME,
           username: data.username || DEFAULT_ACCOUNT_NAME,
           tier: data.tier || 'free'
-        });
+        }, data.expires);
       } else {
-        setUser(data.user || getUser());
+        applyAuthResult(null, data.user || getUser(), data.expires);
       }
     } catch (e) {
       console.error('Error refreshing session:', e);
@@ -288,7 +320,7 @@ const PlaygroundAuth = (() => {
   }
 
   async function logout() {
-    const token = localStorage.getItem('session_token');
+    const token = localStorage.getItem("g4f_session");
     if (token) {
       try {
         await fetch(`${AUTH_BASE}/members/api/logout`, {
@@ -299,7 +331,7 @@ const PlaygroundAuth = (() => {
         console.warn('Logout request failed:', e);
       }
     }
-    localStorage.removeItem('session_token');
+    localStorage.removeItem("g4f_session");
     setUser(null);
   }
 
@@ -308,12 +340,54 @@ const PlaygroundAuth = (() => {
     await handleRedirectCallback();
     await refreshSession();
   }
-  
+
+  function showLoginModal() {
+    const isLLMPlayground = document.location.hostname === 'llmplayground.net';
+    const providers = isLLMPlayground
+      ? [{ id: 'airforce', label: 'Airforce' }]
+      : [
+          { id: 'github', label: 'GitHub' },
+          { id: 'discord', label: 'Discord' },
+          { id: 'huggingface', label: 'HuggingFace' },
+          { id: 'pollinations', label: 'Pollinations' },
+          { id: 'airforce', label: 'Airforce' },
+        ];
+
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.id = 'login-modal-overlay';
+
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+
+    modal.innerHTML = `
+      <h2 style="margin-bottom:8px">${framework.translate('Sign in to LLMPlayground')}</h2>
+      <p style="font-size:13px;color:var(--text2);margin-bottom:16px;line-height:1.5">${framework.translate('Sign in to unlock member access tokens, provider API keys, and higher usage limits.')}</p>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        ${providers.map(p => `<button class="btn btn-secondary" data-auth-provider="${p.id}">${p.label}</button>`).join('')}
+      </div>
+      <button class="btn btn-secondary" id="login-modal-skip" style="margin-top:12px;width:100%;color:var(--text2)">${framework.translate('Continue as guest')}</button>
+    `;
+
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+
+    modal.querySelectorAll('[data-auth-provider]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        overlay.remove();
+        login(btn.dataset.authProvider);
+      });
+    });
+
+    modal.querySelector('#login-modal-skip').addEventListener('click', () => overlay.remove());
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  }
+
   function isApiKeyToken(token) {
     return token.startsWith(API_KEY_PREFIX);
   }
 
-  return { init, getUser, login, logout, refreshSession };
+  return { init, getUser, login, logout, refreshSession, showLoginModal };
 })();
 
 window.PlaygroundAuth = PlaygroundAuth;

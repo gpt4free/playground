@@ -447,7 +447,7 @@ const ChatPage = (() => {
     if (!payload) throw new Error('No text to play');
     const url = `https://g4f.space/ai/audio/${encodeURIComponent(payload)}`;
     const headers = {};
-    const token = localStorage.getItem('session_token');
+    const token = localStorage.getItem("g4f_session");
     if (token) {
       headers.Authorization = `Bearer ${token}`;
     } else {

@@ -19,7 +19,7 @@ const Store = (() => {
         provider.baseUrl = provider.backupUrl || provider.baseUrl || `https://g4f.space/api/${key}`;
         provider.defaultModel = data.defaultModels[key] || provider.defaultModel;
         provider.baseUrl = provider.baseUrl.replace('{model}', provider.defaultModel)
-        provider.type = provider.type || 'openai';
+        provider.type = key === 'puter' ? key : (provider.type || 'openai');
         provider.models = provider.models || [];
         provider.fetchedModels = [];
         provider.defaultModel = data.defaultModels[key] || provider.defaultModel;
@@ -50,7 +50,7 @@ const Store = (() => {
         type: 'openai',
         models: [],
         fetchedModels: [],
-        defaultModel: 'llama-4-scout',
+        defaultModel: 'gpt-4o-mini',
       },
     ],
     activeProvider: 'api.airforce',
@@ -94,6 +94,12 @@ const Store = (() => {
     });
   }
 
+  function isTokenExpired(expires) {
+    if (!expires) return false;
+    const expiresMs = expires > 1e12 ? expires : expires * 1000;
+    return Date.now() > expiresMs;
+  }
+
   function get(key) {
     try {
       const raw = localStorage.getItem(KEYS[key]);
@@ -107,18 +113,30 @@ const Store = (() => {
     localStorage.setItem(KEYS[key], JSON.stringify(value));
   }
 
+  function setDefault(key, value) {
+    if (localStorage.getItem(KEYS[key])) return;
+    localStorage.setItem(KEYS[key], JSON.stringify(value));
+  }
+
   function deleteSettings() {
     localStorage.removeItem(KEYS['settings']);
   }
 
   function applyProviderConfig(provider) {
     const copy = {...provider};
+    if (copy.expires && isTokenExpired(copy.expires)) {
+      copy.apiKey = '';
+    }
     if (!copy.apiKey && provider.backupUrl) {
-      copy.apiKey = localStorage.getItem("session_token");
+      copy.apiKey = localStorage.getItem("g4f_session");
       copy.isNotProviderKey = true;
     }
     if (copy.apiKey && (copy.apiKey.startsWith("g4f_") || copy.apiKey.startsWith("gfs_"))) {
       copy.baseUrl = provider.backupUrl || provider.baseUrl;
+    }
+    if (!copy.apiKey && copy.baseUrl && copy.baseUrl.startsWith("https://g4f.space/")) {
+      copy.apiKey = localStorage.getItem("g4f_session");
+      copy.isNotProviderKey = true;
     }
     return copy;
   }
@@ -276,6 +294,6 @@ const Store = (() => {
     getPersonas, setPersonas, upsertPersona, deletePersona,
     getChats, getChat, upsertChat, deleteChat, getLastChat,
     getSettings, setSettings, updateSettings, deleteSettings,
-    newId, loadProviders, applyProviderConfig
+    newId, loadProviders, applyProviderConfig, setDefault
   };
 })();

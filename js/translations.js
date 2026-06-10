@@ -161,8 +161,8 @@ async function query(prompt, options = { json: false, cache: true }) {
     let response;
     try {
         response = await fetch(secondPartyUrl, {
-            headers: localStorage.getItem("session_token") ? {
-                'Authorization': `Bearer ${localStorage.getItem("session_token")}`
+            headers: localStorage.getItem("g4f_session") ? {
+                'Authorization': `Bearer ${localStorage.getItem("g4f_session")}`
             } : {}
         });
         window.captureUserTierHeaders?.(response.headers);
@@ -176,8 +176,8 @@ async function query(prompt, options = { json: false, cache: true }) {
             await new Promise(resolve => setTimeout(resolve, delay * 1000));
             try {
                 response = await fetch(secondPartyUrl, {
-                    headers: localStorage.getItem("session_token") ? {
-                        'Authorization': `Bearer ${localStorage.getItem("session_token")}`
+                    headers: localStorage.getItem("g4f_session") ? {
+                        'Authorization': `Bearer ${localStorage.getItem("g4f_session")}`
                     } : {}
                 });
                 window.captureUserTierHeaders?.(response.headers);
