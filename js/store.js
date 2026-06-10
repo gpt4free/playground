@@ -128,14 +128,14 @@ const Store = (() => {
       copy.apiKey = '';
     }
     if (!copy.apiKey && provider.backupUrl) {
-      copy.apiKey = localStorage.getItem("session_token");
+      copy.apiKey = localStorage.getItem("g4f_session");
       copy.isNotProviderKey = true;
     }
     if (copy.apiKey && (copy.apiKey.startsWith("g4f_") || copy.apiKey.startsWith("gfs_"))) {
       copy.baseUrl = provider.backupUrl || provider.baseUrl;
     }
     if (!copy.apiKey && copy.baseUrl && copy.baseUrl.startsWith("https://g4f.space/")) {
-      copy.apiKey = localStorage.getItem("session_token");
+      copy.apiKey = localStorage.getItem("g4f_session");
       copy.isNotProviderKey = true;
     }
     return copy;

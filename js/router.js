@@ -141,7 +141,7 @@ const PlaygroundAuth = (() => {
     if (expires && isTokenExpired(expires)) {
       localStorage.removeItem(USER_KEY);
       localStorage.removeItem(EXPIRES_KEY);
-      localStorage.removeItem('session_token');
+      localStorage.removeItem("g4f_session");
       return null;
     }
     try {
@@ -214,7 +214,7 @@ const PlaygroundAuth = (() => {
   function applyAuthResult(sessionToken, user, expires) {
     console.log('Applying auth result:', { sessionToken, user, expires });
     if (sessionToken) {
-      localStorage.setItem('session_token', sessionToken);
+      localStorage.setItem("g4f_session", sessionToken);
     }
     if (user?.pollinations?.api_key) {
       if (!isTokenExpired(user.pollinations.expires)) {
@@ -266,7 +266,7 @@ const PlaygroundAuth = (() => {
   }
 
   async function refreshSession() {
-    const token = localStorage.getItem('session_token');
+    const token = localStorage.getItem("g4f_session");
     if (!token) {
       setUser(null);
       return;
@@ -277,7 +277,7 @@ const PlaygroundAuth = (() => {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (!response.ok) {
-        localStorage.removeItem('session_token');
+        localStorage.removeItem("g4f_session");
         setUser(null);
         return;
       }
@@ -310,7 +310,7 @@ const PlaygroundAuth = (() => {
   }
 
   async function logout() {
-    const token = localStorage.getItem('session_token');
+    const token = localStorage.getItem("g4f_session");
     if (token) {
       try {
         await fetch(`${AUTH_BASE}/members/api/logout`, {
@@ -321,7 +321,7 @@ const PlaygroundAuth = (() => {
         console.warn('Logout request failed:', e);
       }
     }
-    localStorage.removeItem('session_token');
+    localStorage.removeItem("g4f_session");
     setUser(null);
   }
 
