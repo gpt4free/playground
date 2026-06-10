@@ -130,7 +130,7 @@ const Router = (() => {
 })();
 
 const PlaygroundAuth = (() => {
-  const AUTH_BASE = 'https://auth.gpt4free.workers.dev';
+  const AUTH_BASE = 'https://auth.g4f.space';
   const USER_KEY = 'llmp_user';
   const EXPIRES_KEY = 'expires';
   const DEFAULT_ACCOUNT_NAME = 'Account';
