@@ -432,7 +432,7 @@ const API = (() => {
       responses: streamChatResponses,
     };
 
-    let lastError = null;
+    let firstError = null;
     for (const ep of ordered) {
       try {
         let yielded = false;
@@ -442,10 +442,10 @@ const API = (() => {
         }
         return;
       } catch (err) {
-        if ([401, 402, 429].includes(err.status)) {
+        if ([400, 401, 402, 429].includes(err.status)) {
           throw err;
         }
-        lastError = err;
+        firstError = firstError ||err;
       }
     }
 
@@ -463,11 +463,11 @@ const API = (() => {
         }
         throw new Error('Image generation returned no images');
       } catch (imgErr) {
-        lastError = imgErr;
+        firstError = firstError || imgErr;
       }
     }
 
-    if (lastError) throw lastError;
+    if (firstError) throw firstError;
     throw new Error('All endpoints failed for model: ' + (model || 'unknown'));
   }
 
