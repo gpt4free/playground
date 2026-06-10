@@ -132,10 +132,18 @@ const Router = (() => {
 const PlaygroundAuth = (() => {
   const AUTH_BASE = 'https://auth.gpt4free.workers.dev';
   const USER_KEY = 'llmp_user';
+  const EXPIRES_KEY = 'expires';
   const DEFAULT_ACCOUNT_NAME = 'Account';
   const API_KEY_PREFIX = 'g4f_';
 
   function getUser() {
+    const expires = localStorage.getItem(EXPIRES_KEY);
+    if (expires && isTokenExpired(expires)) {
+      localStorage.removeItem(USER_KEY);
+      localStorage.removeItem(EXPIRES_KEY);
+      localStorage.removeItem('session_token');
+      return null;
+    }
     try {
       return JSON.parse(localStorage.getItem(USER_KEY) || 'null');
     } catch {
@@ -143,11 +151,15 @@ const PlaygroundAuth = (() => {
     }
   }
 
-  function setUser(user) {
+  function setUser(user, expires) {
     if (user) {
       localStorage.setItem(USER_KEY, JSON.stringify(user));
+      if (expires) {
+        localStorage.setItem(EXPIRES_KEY, expires);
+      }
     } else {
       localStorage.removeItem(USER_KEY);
+      localStorage.removeItem(EXPIRES_KEY);
     }
     window.dispatchEvent(new CustomEvent('llmp-auth-updated', { detail: { user } }));
     updateAuthButton(user);
@@ -171,32 +183,58 @@ const PlaygroundAuth = (() => {
     return window.location.href.split('#')[0];
   }
 
-  function setProviderApiKey(providerId, apiKey) {
+  function isTokenExpired(expires) {
+    if (!expires) return false;
+    const expiresMs = expires > 1e12 ? expires : expires * 1000;
+    return Date.now() > expiresMs;
+  }
+
+  function setProviderApiKey(providerId, apiKey, expires) {
     if (!apiKey || typeof Store === 'undefined' || !Store.getProviders) return;
     const provider = Store.getProviders().find(p => p.id === providerId);
     if (!provider) return;
     provider.apiKey = apiKey;
+    if (expires) {
+      provider.apiKeyExpires = expires > 1e12 ? expires : expires * 1000;
+    } else {
+      delete provider.apiKeyExpires;
+    }
     Store.upsertProvider(provider);
   }
 
-  function applyAuthResult(sessionToken, user) {
-    console.log('Applying auth result:', { sessionToken, user });
+  function clearProviderApiKey(providerId) {
+    if (typeof Store === 'undefined' || !Store.getProviders) return;
+    const provider = Store.getProviders().find(p => p.id === providerId);
+    if (!provider) return;
+    provider.apiKey = '';
+    delete provider.apiKeyExpires;
+    Store.upsertProvider(provider);
+  }
+
+  function applyAuthResult(sessionToken, user, expires) {
+    console.log('Applying auth result:', { sessionToken, user, expires });
     if (sessionToken) {
       localStorage.setItem('session_token', sessionToken);
     }
     if (user?.pollinations?.api_key) {
-      Store.setDefault('activeProvider', 'pollinations');
-      setProviderApiKey('pollinations', user.pollinations.api_key);
+      if (!isTokenExpired(user.pollinations.expires)) {
+        Store.setDefault('activeProvider', 'pollinations');
+        setProviderApiKey('pollinations', user.pollinations.api_key, user.pollinations.expires);
+      }
     }
     if (user?.huggingface?.access_token) {
-      Store.setDefault('activeProvider', 'huggingface');
-      setProviderApiKey('huggingface', user.huggingface.access_token);
+      if (!isTokenExpired(user.huggingface.expires)) {
+        Store.setDefault('activeProvider', 'huggingface');
+        setProviderApiKey('huggingface', user.huggingface.access_token, user.huggingface.expires);
+      }
     }
     if (user?.airforce?.access_token) {
-      Store.setDefault('activeProvider', 'api.airforce');
-      setProviderApiKey('api.airforce', user.airforce.access_token);
+      if (!isTokenExpired(user.airforce.expires)) {
+        Store.setDefault('activeProvider', 'api.airforce');
+        setProviderApiKey('api.airforce', user.airforce.access_token, user.airforce.expires);
+      }
     }
-    setUser(user || getUser());
+    setUser(user || getUser(), expires);
   }
 
   async function handleRedirectCallback() {
@@ -207,6 +245,7 @@ const PlaygroundAuth = (() => {
 
     const sessionToken = hashParams.get('session');
     const userParam = hashParams.get('user');
+    const expiresParam = hashParams.get('expires');
     if (sessionToken) {
       let user = getUser();
       if (userParam) {
@@ -216,7 +255,7 @@ const PlaygroundAuth = (() => {
           user = getUser();
         }
       }
-      applyAuthResult(sessionToken, user);
+      applyAuthResult(sessionToken, user, expiresParam);
       handled = true;
     }
 
@@ -248,9 +287,9 @@ const PlaygroundAuth = (() => {
           name: data.username || DEFAULT_ACCOUNT_NAME,
           username: data.username || DEFAULT_ACCOUNT_NAME,
           tier: data.tier || 'free'
-        });
+        }, data.expires);
       } else {
-        setUser(data.user || getUser());
+        applyAuthResult(null, data.user || getUser(), data.expires);
       }
     } catch (e) {
       console.error('Error refreshing session:', e);

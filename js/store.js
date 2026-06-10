@@ -94,6 +94,12 @@ const Store = (() => {
     });
   }
 
+  function isTokenExpired(expires) {
+    if (!expires) return false;
+    const expiresMs = expires > 1e12 ? expires : expires * 1000;
+    return Date.now() > expiresMs;
+  }
+
   function get(key) {
     try {
       const raw = localStorage.getItem(KEYS[key]);
@@ -118,6 +124,9 @@ const Store = (() => {
 
   function applyProviderConfig(provider) {
     const copy = {...provider};
+    if (copy.expires && isTokenExpired(copy.expires)) {
+      copy.apiKey = '';
+    }
     if (!copy.apiKey && provider.backupUrl) {
       copy.apiKey = localStorage.getItem("session_token");
       copy.isNotProviderKey = true;

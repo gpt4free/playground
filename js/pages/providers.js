@@ -152,7 +152,7 @@ const ProvidersPage = (() => {
         </div>
         <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--text2)">
           <span>Model: <strong class="notranslate" style="color:var(--text)">${Components.escHtml(provider.defaultModel || '—')}</strong></span>
-          <span>Key: <strong class="notranslate" style="color:var(--text)">${provider.apiKey ? '••••' + provider.apiKey.slice(-4) : framework.translate('No')}</strong></span>
+          <span>${provider.apiKeyExpires ? `Expires: <strong class="notranslate" style="color:var(--text)">${new Date(provider.apiKeyExpires).toLocaleDateString()}</strong>` : `Key: <strong class="notranslate" style="color:var(--text)">${provider.apiKey ? '••••' + provider.apiKey.slice(-4) : framework.translate('No')}</strong>`}</span>
           <span>Cached: <strong style="color:var(--text)">${provider.fetchedModels?.length || 0}</strong></span>
         </div>
         ${provider.fetchedModels?.length ? `
