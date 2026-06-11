@@ -1,5 +1,5 @@
 const CharactersPage = (() => {
-  const DATA_BASE = 'https://gpt4free.github.io/playground/data/characters';
+  const DATA_BASE = 'https://raw.githubusercontent.com/gpt4free/playground/refs/heads/data/data/characters';
   const AVATAR_BASE = 'https://ella.janitorai.com/bot-avatars/';
   const SEARCH_BATCH = 20;
 
