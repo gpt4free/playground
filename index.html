@@ -485,8 +485,9 @@
     window.captureUserTierHeaders = captureUserTierHeaders;
   </script>
   <script type="module" defer>
-    import { convertModel } from 'https://g4f.dev/dist/js/model.js';
+    import { convertModel, isValidModel } from 'https://g4f.dev/dist/js/model.js';
     window.convertModel = convertModel;
+    window.isValidModel = isValidModel;
   </script>
   <script src="js/store.js" defer></script>
   <script src="js/api.js" defer></script>

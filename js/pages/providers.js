@@ -159,7 +159,7 @@ const ProvidersPage = (() => {
         <div style="margin-top:12px">
           <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px">Default Model</label>
           <select class="model-select default-model-sel" style="width:100%">
-            ${[...provider.fetchedModels].sort((a, b) => String(a.label || a.id || a).toLowerCase().localeCompare(String(b.label || b.id || b).toLowerCase())).map(m => `<option value="${Components.escHtml(m.id || m)}" ${(m.id || m) === provider.defaultModel ? 'selected' : ''}>${Components.escHtml(m.label || m.id || m)}</option>`).join('')}
+            ${[...provider.fetchedModels].filter(window.isValidModel || (() => true)).map(m => `<option value="${Components.escHtml(m.id || m)}" ${(m.id || m) === provider.defaultModel ? 'selected' : ''}>${Components.escHtml(m.label || m.id || m)}</option>`).join('')}
           </select>
         </div>` : ''}`;
 

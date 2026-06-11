@@ -388,10 +388,7 @@ const Components = (() => {
     let rerenderList = null;
 
     function normalize(raw) {
-      return (raw || [])
-        .map(m => ({ id: m.id || m, label: m.label || m.id || m }))
-        .filter(m => m.id)
-        .sort((a, b) => String(a.label).toLowerCase().localeCompare(String(b.label).toLowerCase()));
+      return (raw || []).filter(window.isValidModel || (() => true));
     }
 
     function updateLabel() {
