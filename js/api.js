@@ -414,6 +414,10 @@ const API = (() => {
     if (options.temperature !== undefined) body.temperature = options.temperature;
     if (options.maxTokens) body.max_tokens = options.maxTokens;
     if (options.reasoningEffort) body.reasoning_effort = options.reasoningEffort;
+    if (options.tools) {
+      body.tools = options.tools;
+      body.tool_choice = options.toolChoice || 'auto';
+    }
     for await (const chunk of await puter.ai.chat(filterMessages(messages), false, body)) {
       if (chunk.reasoning) {
         yield { type: 'thinking', content: chunk.reasoning };
@@ -593,7 +597,7 @@ const API = (() => {
     for (const call of calls) {
       const normalized = normalizeToolCall(call);
       if (!normalized) continue;
-      const key = normalized.id || `${normalized.function?.name || 'tool'}:${normalized.index ?? ''}`;
+      const key = normalized.index;
       if (!accumulator[key]) {
         accumulator[key] = normalized;
         continue;
@@ -649,6 +653,7 @@ const API = (() => {
   }
 
   async function* streamChatOpenAI(provider, messages, model, options = {}) {
+    console.log("options:", options);
     const headers = { 'Content-Type': 'application/json' };
     if (provider.apiKey) headers['Authorization'] = `Bearer ${provider.apiKey}`;
   

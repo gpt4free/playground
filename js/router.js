@@ -5,6 +5,7 @@ const Router = (() => {
     '/characters': () => renderPage('characters', CharactersPage),
     '/roleplay': () => renderPage('roleplay', RoleplayPage),
     '/coding': () => renderPage('coding', CodingPage),
+    '/agent': () => renderPage('agent', AgentPage),
     '/personas': renderPersonas,
     '/providers': () => renderPage('providers', ProvidersPage),
   };
@@ -83,6 +84,7 @@ const Router = (() => {
       </div>
       <div class="home-grid">
         ${[
+          { icon: '🤖', title: 'Agent', desc: 'AI-powered project assistant that plans tasks, writes code, and manages project files', route: '/agent' },
           { icon: '💬', title: 'Chat', desc: 'Multi-turn conversations with any AI model, streaming, thinking traces and image generation', route: '/chat' },
           { icon: '🗂️', title: 'Characters', desc: 'A library of 237k+ community characters with search, tags and one-tap chat', route: '/characters' },
           { icon: '🎭', title: 'Roleplay', desc: 'Immersive character chats with personas, avatars and opening scenes', route: '/roleplay' },
