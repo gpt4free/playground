@@ -2,14 +2,15 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>LLMPlayground – Open-Source AI Chat, Roleplay & Coding Playground</title>
   <meta name="description" content="LLMPlayground is an open-source AI playground for chat, roleplay, coding assistance, personas, and provider testing in one fast web app.">
   <meta name="keywords" content="AI playground, LLM playground, AI chat, roleplay AI, coding assistant, OpenAI compatible, gpt4free">
   <meta name="author" content="LLMPlayground contributors">
   <meta name="robots" content="index, follow">
   <meta name="application-name" content="LLMPlayground">
-  <meta name="theme-color" content="#0f0f0f">
+  <meta name="theme-color" content="#121110">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="LLMPlayground">
@@ -29,6 +30,9 @@
   <link rel="shortcut icon" href="img/logo.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="img/logo.svg">
   <link rel="manifest" href="site.webmanifest">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
   <link rel="stylesheet" href="css/coding-editor.css">
   <script type="application/ld+json">
     {
@@ -47,6 +51,7 @@
       },
       "featureList": [
         "AI chat",
+        "Character library",
         "Roleplay personas",
         "Coding assistant",
         "Provider configuration",
@@ -57,27 +62,41 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --bg: #0f0f0f;
-      --bg2: #1a1a1a;
-      --bg3: #242424;
-      --border: #333;
-      --text: #e0e0e0;
-      --text2: #999;
-      --accent: #7c6af7;
-      --accent2: #5b4fcf;
-      --green: #4caf50;
-      --red: #f44336;
-      --yellow: #ff9800;
-      --code-bg: #141414;
-      --nav-height: 56px;
+      --bg: #121110;
+      --bg2: #1a1917;
+      --bg3: #242220;
+      --bg-hover: #2c2a27;
+      --border: rgba(255,255,255,0.07);
+      --border2: rgba(255,255,255,0.13);
+      --text: #f2efe9;
+      --text2: #a39e93;
+      --accent: #f59e0b;
+      --accent2: #d97706;
+      --accent-grad: linear-gradient(135deg, #fbbf24, #f59e0b);
+      --accent-soft: rgba(245, 158, 11, 0.12);
+      --accent-border: rgba(245, 158, 11, 0.38);
+      --on-accent: #1c1303;
+      --green: #4ade80;
+      --red: #f87171;
+      --yellow: #fbbf24;
+      --code-bg: #161412;
+      --nav-height: 54px;
+      --rail-width: 70px;
+      --tabbar-height: 58px;
+      --radius-s: 8px;
+      --radius: 12px;
+      --radius-l: 16px;
       --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --shadow: 0 12px 40px rgba(0,0,0,0.5);
+      --glass: rgba(26, 25, 23, 0.85);
     }
     html { height: 100%; overflow: hidden; }
     body {
       background: var(--bg);
       color: var(--text);
-      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
       font-size: 15px;
+      letter-spacing: -0.011em;
       height: 100%;
       display: flex;
       flex-direction: column;
@@ -85,142 +104,179 @@
       -webkit-tap-highlight-color: transparent;
       -webkit-text-size-adjust: 100%;
     }
+    ::selection { background: rgba(245,158,11,0.25); }
 
     #nav {
-      background: var(--bg2);
+      background: var(--bg);
       border-bottom: 1px solid var(--border);
       display: flex;
       align-items: center;
-      padding: 0 12px;
+      padding: 0 14px;
       height: var(--nav-height);
-      gap: 4px;
+      gap: 8px;
       flex-shrink: 0;
-      position: relative;
       z-index: 100;
     }
     #nav .logo {
-      font-weight: 700;
-      font-size: 17px;
-      color: var(--accent);
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      font-weight: 800;
+      font-size: 15.5px;
+      letter-spacing: -0.02em;
+      color: var(--text);
       text-decoration: none;
       white-space: nowrap;
-      margin-right: 8px;
     }
-    .nav-links {
-      display: none;
-      position: fixed;
-      top: var(--nav-height);
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: var(--bg2);
-      flex-direction: column;
-      padding: 8px 0;
-      z-index: 99;
-      overflow-y: auto;
+    .logo-mark {
+      width: 26px;
+      height: 26px;
+      border-radius: 8px;
+      background: var(--accent-grad);
+      box-shadow: 0 2px 12px rgba(245,158,11,0.4);
+      flex-shrink: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--on-accent);
+      font-size: 14px;
+      font-weight: 800;
     }
-    .nav-links.open { display: flex; }
-    .nav-links a {
-      color: var(--text2);
-      text-decoration: none;
-      padding: 14px 20px;
-      font-size: 16px;
-      border-bottom: 1px solid var(--border);
-      transition: background 0.15s, color 0.15s;
-    }
-    .nav-links a:hover, .nav-links a:active { background: var(--bg3); color: var(--text); }
-    .nav-links a.active { color: var(--accent); background: var(--bg3); }
+    .nav-links { display: none; }
     #nav .spacer { flex: 1; }
     #nav .provider-badge {
       font-size: 11px;
+      font-weight: 500;
       color: var(--text2);
-      background: var(--bg3);
+      background: var(--bg2);
       border: 1px solid var(--border);
-      border-radius: 4px;
-      padding: 4px 8px;
+      border-radius: 99px;
+      padding: 5px 12px;
       cursor: pointer;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      max-width: 140px;
+      max-width: 150px;
+      transition: border-color .15s, color .15s;
     }
-    #nav .provider-badge:hover { border-color: var(--accent); color: var(--accent); }
-    .hamburger {
+    #nav .provider-badge:hover { border-color: var(--accent-border); color: var(--text); }
+    #nav .translate-btn {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text2);
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 99px;
+      padding: 5px 11px;
+      cursor: pointer;
+      transition: border-color .15s, color .15s;
+      text-decoration: none;
+    }
+    #nav .translate-btn:hover { border-color: var(--accent-border); color: var(--text); }
+    #nav .translate-btn:disabled { opacity: 0.5; cursor: default; }
+
+    #shell { flex: 1; display: flex; min-height: 0; }
+    #rail { display: none; }
+
+    #tabbar {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: calc(var(--tabbar-height) + var(--safe-bottom));
+      padding-bottom: var(--safe-bottom);
+      background: var(--glass);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-top: 1px solid var(--border);
+      display: flex;
+      z-index: 100;
+    }
+    #tabbar a {
+      flex: 1;
       display: flex;
       flex-direction: column;
+      align-items: center;
       justify-content: center;
-      gap: 5px;
-      width: 40px;
-      height: 40px;
-      padding: 8px;
-      cursor: pointer;
-      border: none;
-      background: none;
-      border-radius: 6px;
+      gap: 3px;
+      text-decoration: none;
+      color: var(--text2);
+      font-size: 10px;
+      font-weight: 600;
+      transition: color .15s;
     }
-    .hamburger:active { background: var(--bg3); }
-    .hamburger span {
-      display: block;
-      width: 100%;
-      height: 2px;
-      background: var(--text);
-      border-radius: 1px;
-      transition: transform 0.2s, opacity 0.2s;
-    }
-    .hamburger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
-    .hamburger.open span:nth-child(2) { opacity: 0; }
-    .hamburger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+    #tabbar a .tab-icon { font-size: 20px; line-height: 1; filter: grayscale(1) opacity(0.55); transition: filter .15s, transform .15s; }
+    #tabbar a.active { color: var(--accent); }
+    #tabbar a.active .tab-icon { filter: none; transform: translateY(-1px); }
 
-    #app { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+    #app { flex: 1; overflow: hidden; display: flex; flex-direction: column; min-width: 0; padding-bottom: calc(var(--tabbar-height) + var(--safe-bottom)); }
     #app-content { flex: 1; overflow: hidden; }
     .page { display: none; height: 100%; overflow: hidden; }
     .page.active { display: flex; flex-direction: column; }
 
     .toast-container {
       position: fixed;
-      bottom: calc(12px + var(--safe-bottom));
-      left: 12px;
-      right: 12px;
+      top: calc(var(--nav-height) + 10px);
+      left: 50%;
+      transform: translateX(-50%);
       display: flex;
       flex-direction: column;
+      align-items: center;
       gap: 8px;
       z-index: 9999;
       pointer-events: none;
+      width: max-content;
+      max-width: calc(100vw - 32px);
     }
     .toast {
       background: var(--bg3);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 12px 16px;
-      font-size: 14px;
-      animation: slideUp 0.25s ease;
+      border: 1px solid var(--border2);
+      border-radius: 99px;
+      padding: 9px 18px;
+      font-size: 13px;
+      font-weight: 500;
+      box-shadow: var(--shadow);
+      animation: toastIn 0.25s cubic-bezier(.2,.9,.3,1.2);
       pointer-events: auto;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
-    .toast.success { border-color: var(--green); color: var(--green); }
-    .toast.error { border-color: var(--red); color: var(--red); }
-    .toast.info { border-color: var(--accent); color: var(--accent); }
-    @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    .toast.success { border-color: rgba(74,222,128,0.4); color: var(--green); }
+    .toast.error { border-color: rgba(248,113,113,0.4); color: var(--red); }
+    .toast.info { border-color: var(--accent-border); color: var(--accent); }
+    @keyframes toastIn { from { transform: translateY(-12px) scale(.95); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
 
     button {
       cursor: pointer;
       border: none;
-      border-radius: 8px;
+      border-radius: var(--radius-s);
       font-size: 14px;
       font-family: inherit;
-      transition: background 0.15s;
+      font-weight: 500;
+      color: var(--text);
+      transition: background .15s, border-color .15s, color .15s, transform .1s, box-shadow .15s, filter .15s;
       -webkit-tap-highlight-color: transparent;
     }
-    input:not([type=radio], [type="checkbox"]), textarea, select {
-      background: var(--bg3);
+    button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+    input:not([type=radio], [type=checkbox]), textarea, select {
+      background: var(--bg2);
       border: 1px solid var(--border);
       color: var(--text);
-      border-radius: 8px;
+      border-radius: var(--radius-s);
       font-size: 16px;
       font-family: inherit;
       outline: none;
-      transition: border-color 0.15s;
+      transition: border-color .15s, background .15s;
       appearance: none;
       -webkit-appearance: none;
+    }
+    select {
+      background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23a39e93' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      padding-right: 28px !important;
     }
     input[type="checkbox"].tool-checkbox {
       width: 18px;
@@ -230,123 +286,183 @@
       margin-top: 2px;
       flex-shrink: 0;
     }
-    input:focus, textarea:focus, select:focus { border-color: var(--accent); }
-    input::placeholder, textarea::placeholder { color: var(--text2); }
-    select option { background: var(--bg3); }
+    input:focus, textarea:focus, select:focus { border-color: var(--accent-border); background: var(--bg3); }
+    input::placeholder, textarea::placeholder { color: var(--text2); opacity: 0.7; }
+    select option { background: var(--bg3); color: var(--text); }
 
-    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--accent-border); }
 
-    .btn { padding: 10px 16px; font-size: 14px; border-radius: 8px; border: none; cursor: pointer; min-height: 44px; }
-    .btn-primary { background: var(--accent); color: #fff; }
-    .btn-primary:hover { background: var(--accent2); }
-    .btn-primary:active { background: var(--accent2); transform: scale(0.97); }
+    .btn { padding: 10px 16px; font-size: 14px; border-radius: 10px; border: none; cursor: pointer; min-height: 42px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+    .btn-primary { background: var(--accent-grad); color: var(--on-accent); font-weight: 700; box-shadow: 0 2px 14px rgba(245,158,11,0.3); }
+    .btn-primary:hover { filter: brightness(1.08); box-shadow: 0 4px 18px rgba(245,158,11,0.4); }
+    .btn-primary:active { transform: scale(0.97); }
+    .btn-primary:disabled { filter: saturate(0.3) brightness(0.6); cursor: default; box-shadow: none; }
     .btn-secondary { background: var(--bg3); color: var(--text); border: 1px solid var(--border); }
-    .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+    .btn-secondary:hover { border-color: var(--accent-border); background: var(--bg-hover); }
     .btn-secondary:active { transform: scale(0.97); }
-    .btn-danger { background: transparent; color: var(--red); border: 1px solid var(--red); }
-    .btn-danger:hover { background: var(--red); color: #fff; }
-    .btn-sm { padding: 6px 12px; font-size: 13px; min-height: 36px; }
+    .btn-danger { background: transparent; color: var(--red); border: 1px solid rgba(248,113,113,0.35); }
+    .btn-danger:hover { background: rgba(248,113,113,0.12); border-color: var(--red); }
+    .btn-sm { padding: 6px 12px; font-size: 13px; min-height: 34px; border-radius: 8px; }
 
-    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: flex; align-items: flex-end; justify-content: center; z-index: 1000; }
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(8,7,5,0.65);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      z-index: 1000;
+      animation: fadeIn .2s ease;
+    }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     .modal {
       background: var(--bg2);
-      border: 1px solid var(--border);
-      border-radius: 16px 16px 0 0;
-      padding: 20px;
+      border: 1px solid var(--border2);
+      border-radius: var(--radius-l) var(--radius-l) 0 0;
+      padding: 22px 20px calc(22px + var(--safe-bottom));
       width: 100%;
-      max-height: 90vh;
+      max-height: 88vh;
       overflow-y: auto;
-      animation: slideModalUp 0.25s ease;
+      animation: slideModalUp 0.3s cubic-bezier(.2,.9,.3,1);
+      box-shadow: var(--shadow);
     }
-    @keyframes slideModalUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-    .modal h2 { font-size: 17px; margin-bottom: 16px; }
+    @keyframes slideModalUp { from { transform: translateY(40px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    .modal h2 { font-size: 17px; font-weight: 700; margin-bottom: 16px; letter-spacing: -0.02em; }
     .form-group { margin-bottom: 14px; }
-    .form-group label { font-size: 13px; color: var(--text2); margin: 0 6px 6px 0; }
+    .form-group label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text2); margin: 0 6px 6px 0; }
     .form-group label:not(.radio-label) { display: block; }
     .form-group input:not([type=radio]), .form-group textarea, .form-group select { width: 100%; padding: 10px 12px; }
     .form-group textarea { resize: vertical; min-height: 80px; }
 
     @media (min-width: 768px) {
-      :root { --nav-height: 48px; }
       body { font-size: 14px; }
-      #nav { padding: 0 16px; gap: 4px; }
-      #nav .provider-badge { max-width: 280px; }
-      .hamburger { display: none; }
-      .nav-links {
+      #nav { display: none; }
+      #tabbar { display: none; }
+      #app { padding-bottom: 0; }
+      #rail {
         display: flex;
-        position: static;
-        flex-direction: row;
-        background: none;
-        padding: 0;
+        flex-direction: column;
+        align-items: center;
+        width: var(--rail-width);
+        flex-shrink: 0;
+        padding: 14px 8px 12px;
         gap: 2px;
-        overflow: visible;
+        background: var(--bg2);
+        border-right: 1px solid var(--border);
+        z-index: 100;
       }
-      .nav-links a {
-        padding: 6px 12px;
-        font-size: 13px;
-        border-bottom: none;
-        border-radius: 6px;
+      #rail .logo-mark { width: 34px; height: 34px; border-radius: 11px; font-size: 17px; margin-bottom: 14px; }
+      #rail a.rail-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 3px;
+        width: 100%;
+        padding: 9px 0 7px;
+        border-radius: var(--radius);
+        color: var(--text2);
+        text-decoration: none;
+        font-size: 9.5px;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+        transition: background .15s, color .15s;
+      }
+      #rail a.rail-item .ri { font-size: 19px; line-height: 1; filter: grayscale(1) opacity(0.6); transition: filter .15s; }
+      #rail a.rail-item:hover { background: var(--bg3); color: var(--text); }
+      #rail a.rail-item.active { background: var(--accent-soft); color: var(--accent); }
+      #rail a.rail-item.active .ri { filter: none; }
+      #rail .rail-spacer { flex: 1; }
+      #rail .translate-btn { background: none; border: none; font-size: 16px; color: var(--text2); cursor: pointer; padding: 8px; border-radius: 10px; text-decoration: none; line-height: 1; }
+      #rail .translate-btn:hover { background: var(--bg3); }
+      #rail .provider-badge {
+        font-size: 9px;
+        font-weight: 600;
+        color: var(--text2);
+        background: var(--bg3);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 5px 6px;
+        cursor: pointer;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
         white-space: nowrap;
+        text-align: center;
+        margin-top: 6px;
       }
-      .toast-container { left: auto; right: 20px; bottom: 20px; max-width: 360px; }
-      .toast { border-radius: 8px; font-size: 13px; }
-      .btn { min-height: auto; padding: 7px 14px; font-size: 13px; border-radius: 6px; }
-      .btn-sm { padding: 4px 10px; font-size: 12px; min-height: auto; }
-      input, textarea, select { font-size: 13px; border-radius: 6px; }
+      #rail .provider-badge:hover { border-color: var(--accent-border); color: var(--text); }
+      .toast-container { top: 14px; }
+      .btn { min-height: auto; padding: 8px 15px; font-size: 13px; }
+      .btn-sm { padding: 5px 11px; font-size: 12px; min-height: auto; }
+      input:not([type=radio], [type=checkbox]), textarea, select { font-size: 13px; }
       .form-group input, .form-group textarea, .form-group select { padding: 8px 10px; }
       .modal-overlay { align-items: center; }
       .modal {
-        border-radius: 12px;
-        padding: 24px;
-        min-width: 360px;
-        max-width: 560px;
+        border-radius: var(--radius-l);
+        padding: 26px;
+        min-width: 380px;
+        max-width: 580px;
         width: 90%;
-        animation: none;
       }
     }
-    #nav .translate-btn { font-size: 11px; color: var(--text2); background: var(--bg3); border: 1px solid var(--border); border-radius: 4px; padding: 3px 8px; cursor: pointer; }
-    #nav .translate-btn:hover { border-color: var(--accent); color: var(--accent); }
-    #nav .translate-btn:disabled { opacity: 0.5; cursor: default; }
   </style>
 </head>
 <body>
   <nav id="nav">
-    <button class="hamburger" id="hamburger-btn" aria-label="Menu">
-      <span></span>
-      <span></span>
-      <span></span>
-    </button>
-    <a href="#/" class="logo notranslate">LLMPlayground</a>
-    <div class="nav-links" id="nav-links">
-      <a href="#/chat" data-route="/chat">Chat</a>
-      <a href="#/roleplay" data-route="/roleplay">Roleplay</a>
-      <a href="#/coding" data-route="/coding">Coding</a>
-      <a href="#/personas" data-route="/personas">Personas</a>
-      <a href="#/providers" data-route="/providers">Providers</a>
-    </div>
+    <a href="#/" class="logo notranslate"><span class="logo-mark">⌬</span>LLMPlayground</a>
     <div class="spacer"></div>
     <a class="translate-btn" id="btn-translate" onclick="btnTranslate(this); return false;" title="Translate">🌐</a>
     <button class="translate-btn notranslate" id="auth-status-btn" onclick="window.location.hash='#/providers'" title="Login">Login</button>
     <span class="provider-badge notranslate" id="active-provider-badge" onclick="window.location.hash='#/providers'">Loading...</span>
   </nav>
-  <div id="app">
-    <div id="app-content">
-      <div class="page" id="page-home"></div>
-      <div class="page" id="page-chat"></div>
-      <div class="page" id="page-roleplay"></div>
-      <div class="page" id="page-coding"></div>
-      <div class="page" id="page-personas"></div>
-      <div class="page" id="page-providers"></div>
+  <div id="shell">
+    <nav id="rail">
+      <a href="#/" class="notranslate" title="Home"><span class="logo-mark">⌬</span></a>
+      <a href="#/chat" data-route="/chat" class="rail-item"><span class="ri">💬</span><span>Chat</span></a>
+      <a href="#/characters" data-route="/characters" class="rail-item"><span class="ri">🗂️</span><span>Library</span></a>
+      <a href="#/roleplay" data-route="/roleplay" class="rail-item"><span class="ri">🎭</span><span>Roleplay</span></a>
+      <a href="#/coding" data-route="/coding" class="rail-item"><span class="ri">⌨️</span><span>Coding</span></a>
+      <a href="#/agent" data-route="/agent" class="rail-item"><span class="ri">🤖</span><span>Agent</span></a>
+      <a href="#/personas" data-route="/personas" class="rail-item"><span class="ri">🧑‍🎨</span><span>Personas</span></a>
+      <a href="#/providers" data-route="/providers" class="rail-item"><span class="ri">⚙️</span><span>Settings</span></a>
+      <div class="rail-spacer"></div>
+      <a class="translate-btn" onclick="btnTranslate(this); return false;" title="Translate">🌐</a>
+      <button class="translate-btn notranslate" id="auth-status-btn-rail" onclick="window.location.hash='#/providers'" title="Login">👤</button>
+      <span class="provider-badge notranslate" id="active-provider-badge-rail" onclick="window.location.hash='#/providers'">…</span>
+    </nav>
+    <div id="app">
+      <div id="app-content">
+        <div class="page" id="page-home"></div>
+        <div class="page" id="page-chat"></div>
+        <div class="page" id="page-characters"></div>
+        <div class="page" id="page-roleplay"></div>
+        <div class="page" id="page-coding"></div>
+        <div class="page" id="page-agent"></div>
+        <div class="page" id="page-personas"></div>
+        <div class="page" id="page-providers"></div>
+      </div>
     </div>
   </div>
+  <nav id="tabbar">
+    <a href="#/chat" data-route="/chat"><span class="tab-icon">💬</span><span>Chat</span></a>
+    <a href="#/characters" data-route="/characters"><span class="tab-icon">🗂️</span><span>Library</span></a>
+    <a href="#/roleplay" data-route="/roleplay"><span class="tab-icon">🎭</span><span>Roleplay</span></a>
+    <a href="#/coding" data-route="/coding"><span class="tab-icon">⌨️</span><span>Coding</span></a>
+    <a href="#/agent" data-route="/agent"><span class="tab-icon">🤖</span><span>Agent</span></a>
+    <a href="#/providers" data-route="/providers"><span class="tab-icon">⚙️</span><span>Settings</span></a>
+  </nav>
   <div class="toast-container" id="toasts"></div>
 
-  <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs/loader.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs/loader.min.js" defer onload="window.__monacoLoaderReady()"></script>
   <script src="https://g4f.dev/dist/js/sanitize-html.js" async></script>
   <script>
     window.MonacoReady = new Promise(function(resolve) {
+      window.__monacoLoaderReady = function() {
       require.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs' } });
       require(['vs/editor/editor.main'], function() {
         monaco.editor.defineTheme('llmplayground', {
@@ -354,39 +470,41 @@
           inherit: true,
           rules: [],
           colors: {
-            'editor.background': '#141414',
-            'editor.foreground': '#e0e0e0',
-            'editorLineNumber.foreground': '#555',
-            'editorCursor.foreground': '#7c6af7',
-            'editor.selectionBackground': '#3a3560',
-            'editor.lineHighlightBackground': '#1a1a2e'
+            'editor.background': '#161412',
+            'editor.foreground': '#f2efe9',
+            'editorLineNumber.foreground': '#5c574e',
+            'editorCursor.foreground': '#f59e0b',
+            'editor.selectionBackground': '#4a3a18',
+            'editor.lineHighlightBackground': '#1f1d1a84'
           }
         });
         resolve();
       });
+      };
     });
   </script>
   <script type="module" async>
-    // query() (translations.js) calls this so API responses can emit userTierUpdate data used by
-    // the auth/tier UI (tier badge and limits) after authenticated requests.
     import { captureUserTierHeaders } from 'https://g4f.dev/dist/js/providers.js';
     window.captureUserTierHeaders = captureUserTierHeaders;
   </script>
   <script type="module" defer>
-    import { convertModel } from 'https://g4f.dev/dist/js/model.js';
+    import { convertModel, isValidModel } from 'https://g4f.dev/dist/js/model.js';
     window.convertModel = convertModel;
+    window.isValidModel = isValidModel;
   </script>
-  <script src="js/store.js"></script>
-  <script src="js/api.js"></script>
-  <script src="https://g4f.dev/dist/js/mcp-client.js"></script>
-  <script src="js/translations.js"></script>
-  <script src="js/components.js"></script>
-  <script src="js/editor-panel.js"></script>
-  <script src="js/pages/chat.js"></script>
-  <script src="js/pages/roleplay.js"></script>
-  <script src="js/pages/coding.js"></script>
-  <script src="js/pages/personas.js"></script>
-  <script src="js/pages/providers.js"></script>
-  <script src="js/router.js"></script>
+  <script src="js/store.js" defer></script>
+  <script src="js/api.js" defer></script>
+  <script src="https://g4f.dev/dist/js/mcp-client.js" defer></script>
+  <script src="js/translations.js" defer></script>
+  <script src="js/components.js" defer></script>
+  <script src="js/editor-panel.js" defer></script>
+  <script src="js/pages/chat.js" defer></script>
+  <script src="js/pages/characters.js" defer></script>
+  <script src="js/pages/roleplay.js" defer></script>
+  <script src="js/pages/coding.js" defer></script>
+  <script src="js/pages/agent.js" defer></script>
+  <script src="js/pages/personas.js" defer></script>
+  <script src="js/pages/providers.js" defer></script>
+  <script src="js/router.js" defer></script>
 </body>
 </html>

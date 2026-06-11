@@ -1,10 +1,65 @@
 window.framework = window.framework || {};
-framework.backendUrl = "";
+
+const checkUrls = [];
+if (window.location.protocol === "file:") {
+    checkUrls.push("http://localhost:1337");
+    checkUrls.push("http://localhost:8080");
+}
+if (["https:", "http:"].includes(window.location.protocol)) {
+    checkUrls.push(window.location.origin);
+}
+checkUrls.push("https://g4f.space");
+
+async function checkUrl(url, connectStatus) {
+    let response;
+    try {
+        response = await fetch(`${url}/backend-api/v2/version?cache=true`, {signal: AbortSignal.timeout(10000)});
+    } catch (error) {
+        console.debug("Error check url: ", url);
+        return false;
+    }
+    if (response.ok) {
+        connectStatus ? connectStatus.innerText = url : null;
+        localStorage.setItem('backendUrl', url);
+        framework.backendUrl = url;
+        return true;
+    }
+    return false;
+}
+
+framework.backendUrl = localStorage.getItem('backendUrl') || '';
+framework.language = navigator.language === "de" ? 'de-DE' : navigator.language === "es" ? 'es-ES' : navigator.language;
+framework.language = !framework.language || framework.language.startsWith("en") ? "en-US" : framework.language;
+
+framework.connectToBackend = async (connectStatus) => {
+    for (const url of checkUrls) {
+        if(await checkUrl(url, connectStatus)) {
+            return;
+        }
+    }
+    if (framework.backendUrl) {
+        if(await checkUrl(framework.backendUrl, connectStatus)) {
+            return;
+        }
+        localStorage.removeItem('backendUrl');
+        framework.backendUrl = "";
+    }
+};
+
+
+try {
+    const lastConnect = parseInt(localStorage.getItem('lastConnectToBackend') || '0', 10);
+    const oneHour = 60 * 60 * 1000;
+    if (!framework.backendUrl || (Date.now() - lastConnect) > oneHour) {
+        framework.connectToBackend();
+        localStorage.setItem('lastConnectToBackend', Date.now().toString());
+    }
+} catch (e) {
+    console.warn("Error checking backend connectivity:", e);
+}
 
 let newTranslations = [];
 
-// Pre-populate newTranslations from snippets.json so translateAll() covers
-// strings that may not have been rendered yet.
 fetch('js/snippets.json')
     .then(r => r.json())
     .then(snippets => {

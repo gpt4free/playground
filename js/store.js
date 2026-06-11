@@ -25,13 +25,14 @@ const Store = (() => {
         provider.defaultModel = data.defaultModels[key] || provider.defaultModel;
         provider.localStorageKey = data.providerLocalStorage[key] || null;
         provider.checkUrl = data.checkUrls[key] || null;
+        provider.loginButton = data.loginButtons[key] || null;
         if (provider.localStorageKey && localStorage.getItem(provider.localStorageKey)) {
           provider.apiKey = localStorage.getItem(provider.localStorageKey);
         }
       }
       delete data.providers.custom;
       Store.setProviders(Object.values(data.providers));
-      Store.setActiveProviderId(document.location.hostname === 'llmplayground.net' ? 'api.airforce' : Object.keys(data.providers)[0]);
+      Store.setActiveProviderId(data.providers['api.airforce'] ? 'api.airforce' : Object.keys(data.providers)[0]);
       ProvidersPage.renderList();
     });
   }
@@ -125,6 +126,9 @@ const Store = (() => {
   function applyProviderConfig(provider) {
     const copy = {...provider};
     if (copy.expires && isTokenExpired(copy.expires)) {
+      copy.apiKey = '';
+    }
+    if (copy.apiKeyExpires && isTokenExpired(copy.apiKeyExpires)) {
       copy.apiKey = '';
     }
     if (!copy.apiKey && provider.backupUrl) {

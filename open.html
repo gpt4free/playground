@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -30,7 +30,7 @@
       color: #9aa0b4;
     }
     a {
-      color: #7c6af7;
+      color: #f59e0b;
     }
   </style>
 </head>
@@ -53,12 +53,10 @@
       try {
         return JSON.parse(decodeURIComponent(value));
       } catch (err) {
-        // ignore
       }
       try {
         return JSON.parse(base64DecodeUnicode(value));
       } catch (err) {
-        // ignore
       }
       try {
         return JSON.parse(value);

@@ -20,7 +20,7 @@ const ProvidersPage = (() => {
     const newBtn = document.createElement('button');
     newBtn.className = 'btn btn-primary btn-sm';
     newBtn.textContent = '+ Add';
-    newBtn.addEventListener('click', () => openEditor(null));
+    newBtn.addEventListener('click', () => showAddFromListDialog());
     btnWrap.appendChild(newBtn);
     header.appendChild(btnWrap);
 
@@ -60,7 +60,7 @@ const ProvidersPage = (() => {
     section.innerHTML = `
       <h2 style="font-size:15px;margin-bottom:8px">Account</h2>
       <div class="notranslate" style="font-size:13px;color:var(--text2);margin-bottom:12px">
-        ${user ? `${framework.translate('Signed in as')} <strong style="color:var(--text)">${Components.escHtml(accountName)}</strong> · ${framework.translate('Tier')}: <strong style="color:var(--text)">${Components.escHtml(tier)}</strong>` : `${framework.translate('Sign in to use your members access token and provider API keys.')}`}
+        ${user ? `${framework.translate('Signed in as')} <strong style="color:var(--text)">${Components.escHtml(accountName)}</strong> · ${framework.translate(user.provider === 'airforce' ? 'Plan' : 'Tier')}: <strong style="color:var(--text)">${Components.escHtml(tier)}</strong>${user.provider === 'airforce' ? `<br>${framework.translate('Requests to Airforce API are billed to your account plan.')}` : ''}` : `${framework.translate('Sign in with Airforce to use the models in your plan, or use member access tokens and provider API keys.')}`}
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         ${user ? `
@@ -120,6 +120,206 @@ const ProvidersPage = (() => {
     return colors[type] || 'var(--text2)';
   }
 
+  const CORE_TEMPLATES = [
+    { name: 'OpenAI (core)', baseUrl: 'https://api.openai.com/v1', type: 'openai', defaultModel: '' },
+    { name: 'Anthropic (core)', baseUrl: 'https://api.anthropic.com', type: 'anthropic', defaultModel: '' },
+    { name: 'Google AI (core)', baseUrl: 'https://api.google.com/v1', type: 'google', defaultModel: '' }
+  ];
+
+  // Load and return custom providers from remote endpoints (public + private)
+  async function loadCustomProviders() {
+    const tableId = 'custom-providers-table';
+    const url = 'https://g4f.space/custom/api/servers';
+    const resp = await fetch(url, {
+      headers: { 'Authorization': `Bearer ${localStorage.getItem('g4f_session') || ''}` }
+    });
+    const public_url = 'https://g4f.space/custom/api/servers/public';
+    const public_resp = await fetch(public_url);
+    try {
+      let data = await public_resp.json();
+      data = data.servers || [];
+      let privateData = await resp.json();
+      if (privateData.servers) {
+        data = data.concat(privateData.servers.filter(server => !server.is_public));
+      }
+      return data;
+    } catch (e) {
+      console.error('Error loading custom providers', e);
+      return [];
+    }
+  }
+
+  // Load and return core providers and models from backend API
+  async function loadCoreProviders() {
+    try {
+      const providersUrl = `${framework.backendUrl}/backend-api/v2/providers`;
+      return await fetch(providersUrl).then(r => r.json());
+    } catch (e) {
+      console.error('Error loading core providers', e);
+      return []
+    }
+  }
+
+  function showAddFromListDialog() {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.style.maxWidth = '720px';
+    modal.innerHTML = `
+      <h2>Add Provider</h2>
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <button class="btn btn-secondary btn-sm" data-tab="live">Live</button>
+        <button class="btn btn-secondary btn-sm" data-tab="custom">Custom</button>
+        <button class="btn btn-secondary btn-sm" data-tab="core">Core</button>
+      </div>
+      <div id="add-from-list-body" style="display:flex;flex-direction:column;gap:10px;max-height:420px;overflow:auto"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+        <button class="btn btn-secondary" id="add-list-cancel">Cancel</button>
+      </div>`;
+
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+
+    function close() { overlay.remove(); }
+    modal.querySelector('#add-list-cancel').addEventListener('click', close);
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+
+    const body = modal.querySelector('#add-from-list-body');
+    async function renderTab(tab) {
+      body.innerHTML = '';
+      if (tab === 'live') {
+        const providers = Store.getProviders();
+        if (!providers.length) {
+          body.innerHTML = '<div style="color:var(--text2)">No live providers available.</div>';
+          return;
+        }
+        providers.forEach(p => {
+          const row = document.createElement('div');
+          row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--bg3)';
+          row.innerHTML = `
+            <div style="min-width:0">
+              <div style="font-weight:600" class="notranslate">${Components.escHtml(p.name)}</div>
+              <div style="font-size:12px;color:var(--text2);word-break:break-all" class="notranslate">${Components.escHtml(p.baseUrl)}</div>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-secondary btn-sm" data-action="clone">Clone</button>
+            </div>`;
+          row.querySelector('[data-action="clone"]').addEventListener('click', async () => {
+            const cloned = Object.assign({}, p);
+            cloned.id = Store.newId();
+            cloned.name = `${cloned.name} (copy)`;
+            Store.upsertProvider(cloned);
+            Store.setActiveProviderId(cloned.id);
+            try {
+              let models = await API.fetchModels(Store.applyProviderConfig(cloned));
+              if (window.convertModel) models.forEach(convertModel);
+              if (window.isValidModel) models = models.filter(window.isValidModel);
+              if (models.length) {
+                cloned.fetchedModels = models;
+                if (!cloned.defaultModel) cloned.defaultModel = models[0].id || models[0];
+                Store.upsertProvider(cloned);
+              }
+            } catch {}
+            renderList();
+            updateBadge();
+            Components.toast('Provider added (cloned)', 'success');
+            close();
+          });
+          body.appendChild(row);
+        });
+      } else if (tab === 'custom') {
+        body.innerHTML = '<div style="color:var(--text2)">Loading custom providers...</div>';
+        const servers = await loadCustomProviders();
+        body.innerHTML = '';
+        if (!servers.length) {
+          body.innerHTML = '<div style="color:var(--text2)">No custom providers found.</div>';
+        }
+        servers.forEach(p => {
+          const name = p.name || p.label || p.key || 'Custom Provider';
+          const base = p.url || p.baseUrl || p.base_url || p.endpoint || '';
+          const models = Array.isArray(p.models) && p.models.length ? p.models : (Array.isArray(p.allowed_models) ? p.allowed_models : []);
+          const row = document.createElement('div');
+          row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--bg3)';
+          row.innerHTML = `
+            <div style="min-width:0">
+              <div style="font-weight:600" class="notranslate">${Components.escHtml(name)}</div>
+              <div style="font-size:12px;color:var(--text2);word-break:break-all" class="notranslate">${Components.escHtml(base)}</div>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-primary btn-sm" data-action="add">Add</button>
+            </div>`;
+          row.querySelector('[data-action="add"]').addEventListener('click', async () => {
+            const created = { id: Store.newId(), name, baseUrl: base, apiKey: '', defaultModel: models.length ? (models[0].id || models[0]) : '', endpointType: p.type || 'openai' };
+            Store.upsertProvider(created);
+            Store.setActiveProviderId(created.id);
+            try {
+              const fetched = await API.fetchModels(Store.applyProviderConfig(created));
+              if (fetched.length) {
+                created.fetchedModels = fetched;
+                if (!created.defaultModel) created.defaultModel = fetched[0].id || fetched[0];
+                Store.upsertProvider(created);
+              }
+            } catch {}
+            renderList();
+            updateBadge();
+            Components.toast('Provider added', 'success');
+            close();
+          });
+          body.appendChild(row);
+        });
+      } else if (tab === 'core') {
+        body.innerHTML = '<div style="color:var(--text2)">Loading core providers...</div>';
+        const providers = await loadCoreProviders();
+        body.innerHTML = '';
+        const list = providers && providers.length ? providers : CORE_TEMPLATES;
+        list.forEach(p => {
+          const name = p.name || p.label || p.id || 'Provider';
+          const base = `${framework.backendUrl}/api/${p.name}`
+          const row = document.createElement('div');
+          row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--bg3)';
+          row.innerHTML = `
+            <div style="min-width:0">
+              <div style="font-weight:600" class="notranslate">${Components.escHtml(p.label || p.name)}</div>
+              <div style="font-size:12px;color:var(--text2);word-break:break-all" class="notranslate">${Components.escHtml(base)}</div>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-primary btn-sm" data-action="add">Add</button>
+            </div>`;
+          row.querySelector('[data-action="add"]').addEventListener('click', async () => {
+            const created = { id: Store.newId(), name, baseUrl: base, apiKey: '', endpointType: p.type || p.endpointType || 'openai' };
+            Store.upsertProvider(created);
+            Store.setActiveProviderId(created.id);
+            try {
+              const fetched = await API.fetchModels(Store.applyProviderConfig(created));
+              if (fetched.length) {
+                created.fetchedModels = fetched;
+                if (!created.defaultModel) created.defaultModel = fetched.find(m => m.default).id || fetched[0].id || fetched[0];
+                Store.upsertProvider(created);
+              }
+            } catch {}
+            renderList();
+            updateBadge();
+            Components.toast('Provider added', 'success');
+            close();
+          });
+          body.appendChild(row);
+        });
+      }
+    }
+
+    modal.querySelectorAll('button[data-tab]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        modal.querySelectorAll('button[data-tab]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        renderTab(btn.dataset.tab);
+      });
+    });
+
+    // default to core tab
+    modal.querySelector('button[data-tab="core"]').click();
+  }
+
   function renderList() {
     const list = document.getElementById('providers-list');
     if (!list) return;
@@ -148,7 +348,8 @@ const ProvidersPage = (() => {
           <button class="btn btn-secondary btn-sm" data-action="fetch-models">Fetch Models</button>
           <button class="btn btn-secondary btn-sm" data-action="redetect">Check</button>
           <button class="btn btn-secondary btn-sm" data-action="edit">Edit</button>
-          ${provider.id !== 'airforce' ? `<button class="btn btn-danger btn-sm" data-action="delete">Delete</button>` : ''}
+          ${provider.loginButton && Date.now() > provider.apiKeyExpires ? `<button class="btn btn-secondary btn-sm" data-action="login" data-auth-provider="${provider.loginButton}">Login</button>` : ''}
+          ${provider.id !== 'api.airforce' ? `<button class="btn btn-danger btn-sm" data-action="delete">Delete</button>` : ''}
         </div>
         <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--text2)">
           <span>Model: <strong class="notranslate" style="color:var(--text)">${Components.escHtml(provider.defaultModel || '—')}</strong></span>
@@ -159,7 +360,7 @@ const ProvidersPage = (() => {
         <div style="margin-top:12px">
           <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px">Default Model</label>
           <select class="model-select default-model-sel" style="width:100%">
-            ${provider.fetchedModels.map(m => `<option value="${Components.escHtml(m.id || m)}" ${(m.id || m) === provider.defaultModel ? 'selected' : ''}>${Components.escHtml(m.label || m.id || m)}</option>`).join('')}
+            ${[...provider.fetchedModels].filter(window.isValidModel || (() => true)).map(m => `<option value="${Components.escHtml(m.id || m)}" ${(m.id || m) === provider.defaultModel ? 'selected' : ''}>${Components.escHtml(m.label || m.id || m)}</option>`).join('')}
           </select>
         </div>` : ''}`;
 
@@ -196,6 +397,10 @@ const ProvidersPage = (() => {
       });
 
       card.querySelector('[data-action="edit"]')?.addEventListener('click', () => openEditor(provider));
+
+      card.querySelector('[data-action="login"]')?.addEventListener('click', (e) => {
+        window.PlaygroundAuth?.login?.(e.target.dataset.authProvider);
+      });
 
       card.querySelector('[data-action="delete"]')?.addEventListener('click', async () => {
         const ok = await Components.confirm(`Delete provider "${provider.name}"?`);
@@ -572,10 +777,15 @@ const ProvidersPage = (() => {
   }
 
   function updateBadge() {
-    const badge = document.getElementById('active-provider-badge');
-    if (!badge) return;
     const p = Store.getActiveProvider();
-    badge.textContent = p ? `${p.name} · ${p.defaultModel || '?'}` : 'No provider';
+    const label = p ? `${p.name} · ${p.defaultModel || '?'}` : 'No provider';
+    const badge = document.getElementById('active-provider-badge');
+    if (badge) badge.textContent = label;
+    const railBadge = document.getElementById('active-provider-badge-rail');
+    if (railBadge) {
+      railBadge.textContent = p ? (p.defaultModel || p.name) : 'No provider';
+      railBadge.title = label;
+    }
   }
 
   return { render, updateBadge, renderList };

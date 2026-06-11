@@ -33,6 +33,10 @@ const API = (() => {
 
   let mcpClient = null;
 
+  function isAirforceOAuthToken(key) {
+    return typeof key === 'string' && key.startsWith('airf_oat_');
+  }
+
   function isImageModel(modelName) {
     if (!modelName) return false;
     return IMAGE_MODEL_PATTERNS.some(p => p.test(modelName));
@@ -123,6 +127,23 @@ const API = (() => {
       const { token } = await signInPuter();
       provider.apiKey = token;
     }
+    if (isAirforceOAuthToken(provider.apiKey)) {
+      let r = null;
+      try {
+        r = await fetch('https://api.airforce/oauth/userinfo', {
+          headers: { 'Authorization': `Bearer ${provider.apiKey}` },
+        });
+        if (r.ok) {
+          const info = await r.json();
+          Components.toast(`${framework.translate('Signed in as')} ${info.username} · ${framework.translate('Plan')}: ${info.plan}`, 'success');
+          return provider.type || 'openai';
+        }
+      } catch {}
+      if (r && r.status === 401) {
+        window.PlaygroundAuth?.clearAirforce?.();
+        throw Object.assign(new Error('Unauthorized'), { status: 401 });
+      }
+    }
     if (provider.apiKey && provider.checkUrl && !provider.isNotProviderKey) {
       let result = null;
       try {
@@ -165,6 +186,7 @@ const API = (() => {
         type: 'anthropic',
         run: () => {
           const anthropicHeaders = { 'Content-Type': 'application/json', 'x-api-key': apiKey || '', 'anthropic-version': '2023-06-01' };
+          if (isAirforceOAuthToken(apiKey)) anthropicHeaders['Authorization'] = `Bearer ${apiKey}`;
           return probeEndpoint(cleanUrl.replace(/\/v1$/, '') + '/v1/messages', {
             method: 'POST',
             headers: anthropicHeaders,
@@ -236,6 +258,7 @@ const API = (() => {
       'x-api-key': provider.apiKey || '',
       'anthropic-version': '2023-06-01',
     };
+    if (isAirforceOAuthToken(provider.apiKey)) headers['Authorization'] = `Bearer ${provider.apiKey}`;
     try {
       const res = await fetchWithRetry(`${baseUrl}/v1/models`, { headers });
       if (res.ok) {
@@ -391,6 +414,10 @@ const API = (() => {
     if (options.temperature !== undefined) body.temperature = options.temperature;
     if (options.maxTokens) body.max_tokens = options.maxTokens;
     if (options.reasoningEffort) body.reasoning_effort = options.reasoningEffort;
+    if (options.tools) {
+      body.tools = options.tools;
+      body.tool_choice = options.toolChoice || 'auto';
+    }
     for await (const chunk of await puter.ai.chat(filterMessages(messages), false, body)) {
       if (chunk.reasoning) {
         yield { type: 'thinking', content: chunk.reasoning };
@@ -411,12 +438,43 @@ const API = (() => {
     }
   }
 
+  function isWrongEndpointError(err) {
+    const msg = String(err?.message || '').toLowerCase();
+    return msg.includes('does not support') ||
+      msg.includes('not supported') ||
+      msg.includes('unsupported') ||
+      msg.includes('only supports') ||
+      msg.includes('use the images endpoint') ||
+      msg.includes('invalid endpoint');
+  }
+
   async function* streamChat(provider, messages, model, options = {}) {
     const type = provider.endpointType || provider.type || 'openai';
 
     if (type === 'puter') {
       yield* streamChatPuter(provider, messages, model, options);
       return;
+    }
+
+    let imageFirstError = null;
+    if (isImageModel(model || provider.defaultModel)) {
+      const lastUser = [...messages].reverse().find(m => m.role === 'user');
+      const imgPrompt = lastUser?.content || '';
+      if (imgPrompt) {
+        try {
+          const images = await generateImage(provider, imgPrompt, model, options);
+          const valid = (images || []).filter(img => img.url || img.b64);
+          if (valid.length > 0) {
+            for (const img of valid) {
+              yield { type: 'image', url: img.url, b64: img.b64, revisedPrompt: img.revisedPrompt };
+            }
+            return;
+          }
+        } catch (imgErr) {
+          if (imgErr.name === 'AbortError') throw imgErr;
+          imageFirstError = imgErr;
+        }
+      }
     }
 
     const ordered = [];
@@ -432,7 +490,7 @@ const API = (() => {
       responses: streamChatResponses,
     };
 
-    let firstError = null;
+    let firstError = imageFirstError;
     for (const ep of ordered) {
       try {
         let yielded = false;
@@ -442,10 +500,14 @@ const API = (() => {
         }
         return;
       } catch (err) {
-        if ([400, 401, 402, 429].includes(err.status)) {
+        if (err.name === 'AbortError') throw err;
+        if ([401, 402, 429].includes(err.status)) {
           throw err;
         }
-        firstError = firstError ||err;
+        if (err.status === 400 && !isWrongEndpointError(err)) {
+          throw err;
+        }
+        firstError = firstError || err;
       }
     }
 
@@ -535,7 +597,7 @@ const API = (() => {
     for (const call of calls) {
       const normalized = normalizeToolCall(call);
       if (!normalized) continue;
-      const key = normalized.id || `${normalized.function?.name || 'tool'}:${normalized.index ?? ''}`;
+      const key = normalized.index;
       if (!accumulator[key]) {
         accumulator[key] = normalized;
         continue;
@@ -591,6 +653,7 @@ const API = (() => {
   }
 
   async function* streamChatOpenAI(provider, messages, model, options = {}) {
+    console.log("options:", options);
     const headers = { 'Content-Type': 'application/json' };
     if (provider.apiKey) headers['Authorization'] = `Bearer ${provider.apiKey}`;
   
@@ -674,6 +737,7 @@ const API = (() => {
       'x-api-key': provider.apiKey || '',
       'anthropic-version': '2023-06-01',
     };
+    if (isAirforceOAuthToken(provider.apiKey)) headers['Authorization'] = `Bearer ${provider.apiKey}`;
 
     const systemMsg = messages.find(m => m.role === 'system');
     const nonSystemMsgs = messages.filter(m => m.role !== 'system').map(m => ({

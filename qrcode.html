@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -20,7 +20,7 @@
     p { margin: 8px 0; color: #c0c0c0; }
     #qrcode { margin: 20px auto; width: 320px; height: 320px; background: white; padding: 16px; border-radius: 16px; display: flex; align-items: center; justify-content: center; }
     button { margin: 8px 4px 0 0; padding: 10px 14px; border: 1px solid #444; border-radius: 10px; background: #1a1a1a; color: #e0e0e0; cursor: pointer; }
-    button:hover { border-color: #7c6af7; }
+    button:hover { border-color: #f59e0b; }
     button:disabled { opacity: 0.45; cursor: not-allowed; }
     .status { margin-top: 10px; font-size: 14px; color: #9aa0b4; }
     .container { max-width: 720px; margin: 0 auto; }
@@ -97,12 +97,10 @@
       try {
         return JSON.parse(decodeURIComponent(value));
       } catch (err) {
-        // ignore
       }
       try {
         return JSON.parse(atob(value));
       } catch (err) {
-        // ignore
       }
       try {
         return JSON.parse(value);
