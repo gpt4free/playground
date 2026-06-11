@@ -254,8 +254,8 @@ const AgentPage = (() => {
     const textarea = document.createElement('textarea');
     textarea.id = 'agent-input';
     textarea.placeholder = 'Describe your project or task... (Ctrl+Enter to send)';
-    textarea.style.cssText = 'flex:1;min-height:60px;max-height:150px;';
-
+    textarea.style.cssText = 'flex:1;min-height:60px;max-height:150px;padding:12px 16px;';
+    
     const sendBtn = document.createElement('button');
     sendBtn.id = 'agent-send-btn';
     sendBtn.className = 'btn btn-primary btn-sm';

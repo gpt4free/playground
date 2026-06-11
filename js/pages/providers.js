@@ -348,7 +348,8 @@ const ProvidersPage = (() => {
           <button class="btn btn-secondary btn-sm" data-action="fetch-models">Fetch Models</button>
           <button class="btn btn-secondary btn-sm" data-action="redetect">Check</button>
           <button class="btn btn-secondary btn-sm" data-action="edit">Edit</button>
-          ${provider.id !== 'airforce' ? `<button class="btn btn-danger btn-sm" data-action="delete">Delete</button>` : ''}
+          ${provider.loginButton ? `<button class="btn btn-secondary btn-sm" data-action="login" data-auth-provider="${provider.loginButton}">Login</button>` : ''}
+          ${provider.id !== 'api.airforce' ? `<button class="btn btn-danger btn-sm" data-action="delete">Delete</button>` : ''}
         </div>
         <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--text2)">
           <span>Model: <strong class="notranslate" style="color:var(--text)">${Components.escHtml(provider.defaultModel || '—')}</strong></span>
@@ -396,6 +397,10 @@ const ProvidersPage = (() => {
       });
 
       card.querySelector('[data-action="edit"]')?.addEventListener('click', () => openEditor(provider));
+
+      card.querySelector('[data-action="login"]')?.addEventListener('click', (e) => {
+        auth?.login?.(e.target.dataset.authProvider);
+      });
 
       card.querySelector('[data-action="delete"]')?.addEventListener('click', async () => {
         const ok = await Components.confirm(`Delete provider "${provider.name}"?`);

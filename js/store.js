@@ -25,6 +25,7 @@ const Store = (() => {
         provider.defaultModel = data.defaultModels[key] || provider.defaultModel;
         provider.localStorageKey = data.providerLocalStorage[key] || null;
         provider.checkUrl = data.checkUrls[key] || null;
+        provider.loginButton = data.loginButtons[key] || null;
         if (provider.localStorageKey && localStorage.getItem(provider.localStorageKey)) {
           provider.apiKey = localStorage.getItem(provider.localStorageKey);
         }
