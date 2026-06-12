@@ -8,6 +8,7 @@ const Router = (() => {
     '/agent': () => renderPage('agent', AgentPage),
     '/personas': renderPersonas,
     '/providers': () => renderPage('providers', ProvidersPage),
+    '/app-store': () => renderPage('app-store', AppStorePage),
   };
 
   function getHash() {
@@ -91,6 +92,7 @@ const Router = (() => {
           { icon: '⌨️', title: 'Coding', desc: 'Copilot-style assistant with a Monaco editor, quick actions and code blocks', route: '/coding' },
           { icon: '🧑‍🎨', title: 'Personas', desc: 'Create, edit and manage your own AI characters', route: '/personas' },
           { icon: '⚙️', title: 'Providers', desc: 'Bring any OpenAI-compatible API — Airforce API works out of the box, no key needed', route: '/providers' },
+          { icon: '🛒', title: 'App Store', desc: 'Browse and launch 40+ mini web apps — games, tools, utilities and more', route: '/app-store' },
         ].map(item => `
           <a href="#${item.route}" class="home-card">
             <div class="hc-icon">${item.icon}</div>
