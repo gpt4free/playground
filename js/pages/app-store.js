@@ -45,7 +45,8 @@ const AppStorePage = (() => {
     // { file: 'video-converter.html', name: 'Video Converter', icon: '🎬', desc: 'Convert video formats' },
     { file: 'voice-controlledstopwatch.html', name: 'Voice Stopwatch', icon: '🎤', desc: 'Voice-controlled stopwatch' },
     { file: 'voice_assistant.html', name: 'Voice Assistant', icon: '🗣️', desc: 'Browser voice assistant' },
-    { file: 'workoutplannerwithtimer.html', name: 'Workout Planner', icon: '🏋️', desc: 'Plan workouts with timer' },
+    { file: 'https://g4f.dev/background.html', name: 'Background AI', icon: '🎨', desc: 'AI-generated background experiments' },
+    { file: 'https://g4f.dev/render.html', name: 'AI Render', icon: '🧠', desc: 'AI-generated content renderer' }
   ];
   const dynamicApps = [];
 
