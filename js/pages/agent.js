@@ -171,6 +171,29 @@ const AgentPage = (() => {
     info.querySelector('#export-project')?.addEventListener('click', exportProject);
   }
 
+  function buildEditorPane() {
+    const pane = document.createElement('div');
+    pane.className = 'agent-editor-pane';
+    pane.id = 'agent-editor-pane';
+
+    pane.innerHTML = `
+      <div class="editor-toolbar">
+        <span class="editor-toolbar-title">Files</span>
+        <button class="btn btn-secondary btn-sm" data-action="toggle-diff">Diff</button>
+        <button class="btn btn-secondary btn-sm" data-action="download">↓ Save</button>
+        <button class="btn btn-secondary btn-sm" data-action="download-all">↓ All</button>
+      </div>
+      <div class="editor-tabs"></div>
+      <div class="editor-container">
+        <div class="editor-empty">
+          <div class="editor-empty-icon">📄</div>
+          <div class="editor-empty-text">Code blocks from responses will appear here</div>
+        </div>
+      </div>`;
+
+    return pane;
+  }
+
   function buildMain() {
     const main = document.createElement('div');
     main.className = 'split-main';
@@ -236,6 +259,11 @@ const AgentPage = (() => {
     messagesDiv.className = 'chat-messages';
     messagesDiv.style.cssText = 'flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px;display:flex;flex-direction:column;gap:12px;';
 
+    const workspace = document.createElement('div');
+    workspace.id = 'agent-workspace';
+    workspace.style.cssText = 'display:flex;flex-direction:column;';
+    workspace.appendChild(messagesDiv);
+
     const inputArea = document.createElement('div');
     inputArea.className = 'chat-input-area';
     inputArea.style.cssText = 'padding:12px 16px;border-top:1px solid var(--border);gap:10px;display:flex;flex-direction:column;';
@@ -282,11 +310,15 @@ const AgentPage = (() => {
 
     const contentContainer = document.createElement('div');
     contentContainer.style.cssText = 'flex:1;display:flex;flex-direction:column;min-height:0;';
-    contentContainer.appendChild(messagesDiv);
+    contentContainer.appendChild(workspace);
     contentContainer.appendChild(inputArea);
+    const editorPane = buildEditorPane();
+    workspace.appendChild(editorPane);
 
     main.appendChild(toolbar);
     main.appendChild(contentContainer);
+
+    EditorPanel.init(editorPane);
 
     return main;
   }
@@ -409,14 +441,36 @@ const AgentPage = (() => {
         bubble.appendChild(contentDiv);
       }
 
+      EditorPanel.applyEditsFromContent(msg.content);
+      EditorPanel.addFilesFromContent(msg.content);
+
       if (msg.files && msg.files.length > 0) {
         const filesDiv = document.createElement('div');
         filesDiv.style.cssText = 'font-size:12px;margin-top:8px;';
         msg.files.forEach(file => {
-          const fileEl = document.createElement('div');
-          fileEl.style.cssText = 'padding:6px;background:rgba(0,0,0,0.2);border-radius:4px;margin:4px 0;font-family:monospace;overflow-x:auto;max-height:150px;overflow-y:auto;';
-          fileEl.innerHTML = `<strong>${Components.escHtml(file.path)}</strong><pre style="margin:6px 0 0 0;white-space:pre-wrap;word-wrap:break-word;">${Components.escHtml(file.content.substring(0, 500))}${file.content.length > 500 ? '...' : ''}</pre>`;
-          filesDiv.appendChild(fileEl);
+          const badge = document.createElement('span');
+          badge.className = 'file-edit-badge';
+          badge.dataset.openFile = file.path;
+          badge.innerHTML = `
+            <span class="file-edit-badge-icon">📄</span>
+            <span class="file-edit-badge-name">${Components.escHtml(file.path)}</span>
+            <span class="file-edit-badge-action">Open in Editor →</span>
+          `;
+          badge.style.cursor = 'pointer';
+          badge.title = 'Click to open file';
+          badge.addEventListener('click', () => {
+            const fname = badge.dataset.openFile;
+            const editorFiles = EditorPanel.getFiles();
+            const idx = editorFiles.findIndex(f => f.name === fname);
+            console.log(idx, fname, editorFiles);
+            if (idx >= 0) {
+              const isMobile = window.innerWidth < 768;
+              if (isMobile) {
+                document.getElementById('editor-fab')?.click();
+              }
+            }
+          });
+          filesDiv.appendChild(badge);
         });
         bubble.appendChild(filesDiv);
       }
@@ -739,7 +793,7 @@ const AgentPage = (() => {
       const createdFiles = [];
       while ((match = fileRegex.exec(assistantMessage.content)) !== null) {
         const [, lang, filepath, content] = match;
-        const trimmedPath = filepath.trim();
+        const trimmedPath = filepath.trim().split(':').slice(-1)[0];
         const trimmedContent = content.trim();
         
         assistantMessage.files.push({

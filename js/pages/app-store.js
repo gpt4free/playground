@@ -50,6 +50,25 @@ const AppStorePage = (() => {
   const dynamicApps = [];
 
   async function loadDynamicApps(filter = '') {
+    const url = "https://miniapps.g4f.space/tools/resumed?type=miniapp&options={%22sortBy%22:[%22generationsWeek%22],%22sortDesc%22:[true],%22mustSort%22:true,%22lang%22:%22en%22,%22itemsPerPage%22:20}&homepage=true&nsfw=0";
+    try {
+      const response = await fetch(url);
+      const data = await response.json();
+      if (data && data.items) {
+        data.items.forEach(item => {
+          if (item.id) {
+            dynamicApps.push({
+              file: `https://cdn.miniapps.ai/miniapps/${item.id}/${item.revision}/index.html?lang=en`,
+              name: item.title,
+              icon: `<img src="https://cdn.miniapps.ai/cdn-cgi/image/w=32,h=32,fit=cover/${item.logo}" alt="${item.title}" style="width:32px;height:32px;">`,
+              desc: item.description
+            });
+          }
+        });
+      }
+    } catch (e) {
+      console.warn('Failed to load dynamic apps:', e);
+    }
 
     const mcpClient = API.getMCPClient();
     if (!mcpClient) return false;
@@ -92,11 +111,10 @@ const AppStorePage = (() => {
 
       const serverUrl = (mcpClient.servers.filter(s => s.enabled) || [null])[0]?.url;    
       const newApps = (JSON.parse(results[0].content).matches || []).map(m => {
-        const file = new URL("/pa/files/" + m.name, serverUrl);
-        console.log('Found file from MCP:', file.href);
-        const name = m.name.replace(/\.html?$/, '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        const file = new URL("/pa/files/" + m.path, serverUrl);
+        const name = m.path.split('/')[0].replace(/\.html?$/, '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
         const icon = '📦';
-        const desc = `App from ${m.name}`;
+        const desc = `App from ${m.path}`;
         return { file: file.href, name, icon, desc };
       });
       const existingFiles = new Set(dynamicApps.map(a => a.file));
@@ -112,7 +130,7 @@ const AppStorePage = (() => {
 
   async function updateAppList(filter = '') {
     await loadDynamicApps(filter);
-    const allApps = [...STATIC_APPS.map(a=>({...a, file: APPS_BASE + a.file})), ...dynamicApps];
+    const allApps = [...STATIC_APPS.map(a=>({...a, file: a.file.startsWith('http') ? a.file : APPS_BASE + a.file})), ...dynamicApps];
     const q = filter.toLowerCase();
     const filtered = allApps.filter(a =>
       !q || a.name.toLowerCase().includes(q) || a.desc.toLowerCase().includes(q)
@@ -175,7 +193,7 @@ const AppStorePage = (() => {
         onmouseleave="this.style.borderColor='var(--border)';this.style.transform='';this.style.boxShadow=''">
         <div style="font-size:28px;line-height:1;">${a.icon}</div>
         <div style="font-weight:700;font-size:14px;color:var(--text);">${a.name}</div>
-        <div style="font-size:12px;color:var(--text2);line-height:1.4;">${a.desc}</div>
+        <div style="font-size:12px;color:var(--text2);line-height:1.4;max-height:48px;overflow:hidden;text-overflow:ellipsis;">${a.desc}</div>
       </div>
     `).join('');
   }
@@ -189,30 +207,30 @@ const AppStorePage = (() => {
     const openLink = document.getElementById('appstore-iframe-open');
     const search = document.getElementById('appstore-search');
 
-    const hashParams = new URLSearchParams();
-    let tempApiKey = 'temp_' + Math.random().toString(36).substr(2, 9);
-    (async () => {
-      try {
-        const response = await fetch('/members/api/keys/generate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' }
-        });
-        const data = await response.json();
-        tempApiKey = data.api_key || data.key || tempApiKey;
-      } catch (e) {
-        console.warn('Failed to generate temp API key via API, using fallback');
-      }
-    })();
-    hashParams.set('temp_api_key', tempApiKey);
+    // const hashParams = new URLSearchParams();
+    // let tempApiKey = 'temp_' + Math.random().toString(36).substr(2, 9);
+    // (async () => {
+    //   try {
+    //     const response = await fetch('/members/api/keys/generate', {
+    //       method: 'POST',
+    //       headers: { 'Content-Type': 'application/json' }
+    //     });
+    //     const data = await response.json();
+    //     tempApiKey = data.api_key || data.key || tempApiKey;
+    //   } catch (e) {
+    //     console.warn('Failed to generate temp API key via API, using fallback');
+    //   }
+    // })();
+    // hashParams.set('temp_api_key', tempApiKey);
 
     if (grid) grid.style.display = 'none';
     if (search) search.style.display = 'none';
     if (iframeView) iframeView.style.display = 'flex';
     if (title) title.textContent = name;
     if (openLink) openLink.href = file;
-    if (iframe) iframe.src = file + '#' + hashParams.toString();
+    if (iframe) iframe.src = file; //+ '#' + hashParams.toString();
 
-    window.__tempApiKey = tempApiKey;
+    // window.__tempApiKey = tempApiKey;
   }
 
   function closeApp() {
