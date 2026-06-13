@@ -223,6 +223,14 @@ const AgentPage = (() => {
       currentModel = modelSel.value;
     });
 
+    // Code editor toggle button
+    const editorToggle = document.createElement('button');
+    editorToggle.className = 'btn btn-secondary btn-sm';
+    editorToggle.id = 'agent-editor-toggle';
+    editorToggle.textContent = '📝 Editor';
+    editorToggle.title = 'Toggle code editor panel';
+    editorToggle.addEventListener('click', toggleEditorPane);
+
     const clearBtn = document.createElement('button');
     clearBtn.className = 'btn btn-secondary btn-sm';
     clearBtn.textContent = 'Clear';
@@ -250,9 +258,21 @@ const AgentPage = (() => {
     toolbar.appendChild(sidebarBtn);
     toolbar.appendChild(titleInput);
     toolbar.appendChild(modelSel);
+    toolbar.appendChild(editorToggle);
     toolbar.appendChild(clearBtn);
     toolbar.appendChild(toolsBadge);
     toolbar.id = 'agent-toolbar';
+
+    // Split layout: chat pane + editor pane
+    const codingLayout = document.createElement('div');
+    codingLayout.className = 'coding-layout';
+    codingLayout.id = 'agent-coding-layout';
+    codingLayout.style.cssText = 'flex:1;min-height:0;';
+
+    // Chat pane
+    const chatPane = document.createElement('div');
+    chatPane.className = 'coding-chat-pane';
+    chatPane.id = 'agent-chat-pane';
 
     const messagesDiv = document.createElement('div');
     messagesDiv.id = 'agent-messages';
@@ -301,6 +321,15 @@ const AgentPage = (() => {
     inputArea.appendChild(statusBar);
     inputArea.appendChild(inputContainer);
 
+    chatPane.appendChild(messagesDiv);
+    chatPane.appendChild(inputArea);
+
+    // Editor pane
+    const editorPane = buildAgentEditorPane();
+
+    codingLayout.appendChild(chatPane);
+    codingLayout.appendChild(editorPane);
+
     if (!document.getElementById('agent-spin-style')) {
       const s = document.createElement('style');
       s.id = 'agent-spin-style';
@@ -316,11 +345,96 @@ const AgentPage = (() => {
     workspace.appendChild(editorPane);
 
     main.appendChild(toolbar);
-    main.appendChild(contentContainer);
+    main.appendChild(codingLayout);
+
+    // Initialize EditorPanel after DOM is attached (only once)
+    setTimeout(() => {
+      const editorPane = document.getElementById('agent-editor-pane');
+      if (editorPane && !editorPane.dataset.editorInitialized) {
+        editorPane.dataset.editorInitialized = '1';
+        EditorPanel.init(editorPane, {
+          onFilesChanged: (files) => {
+            // Sync editor files back to project
+            if (currentProject) {
+              currentProject.files = currentProject.files || {};
+              files.forEach(f => {
+                if (!currentProject.files[f.name]) {
+                  currentProject.files[f.name] = {
+                    content: f.code,
+                    language: f.lang,
+                    createdAt: new Date().toISOString()
+                  };
+                } else {
+                  currentProject.files[f.name].content = f.code;
+                }
+              });
+              Store.upsertChat(currentProject);
+              updateProjectInfo();
+            }
+          }
+        });
+      }
+    }, 50);
 
     EditorPanel.init(editorPane);
 
     return main;
+  }
+
+  function buildAgentEditorPane() {
+    const pane = document.createElement('div');
+    pane.className = 'coding-editor-pane';
+    pane.id = 'agent-editor-pane';
+
+    pane.innerHTML = `
+      <div class="editor-toolbar">
+        <span class="editor-toolbar-title">Files</span>
+        <button class="btn btn-secondary btn-sm" data-action="toggle-diff">Diff</button>
+        <button class="btn btn-secondary btn-sm" data-action="download">↓ Save</button>
+        <button class="btn btn-secondary btn-sm" data-action="download-all">↓ All</button>
+      </div>
+      <div class="editor-tabs"></div>
+      <div class="editor-container">
+        <div class="editor-empty">
+          <div class="editor-empty-icon">📄</div>
+          <div class="editor-empty-text">Code blocks from agent responses will appear here</div>
+        </div>
+      </div>`;
+
+    return pane;
+  }
+
+  function toggleEditorPane() {
+    const editorPane = document.getElementById('agent-editor-pane');
+    const toggleBtn = document.getElementById('agent-editor-toggle');
+    if (!editorPane) return;
+    const isVisible = editorPane.classList.contains('visible');
+    if (isVisible) {
+      editorPane.classList.remove('visible');
+      if (toggleBtn) toggleBtn.textContent = '📝 Editor';
+    } else {
+      editorPane.classList.add('visible');
+      if (toggleBtn) toggleBtn.textContent = '💬 Chat';
+      // Populate editor with project files if empty
+      populateEditorFromProject();
+    }
+  }
+
+  function populateEditorFromProject() {
+    if (!currentProject || !currentProject.files) return;
+    const editorFiles = EditorPanel.getFiles();
+    if (editorFiles.length > 0) return; // Already has files
+
+    const fileEntries = Object.entries(currentProject.files);
+    if (fileEntries.length === 0) return;
+
+    // Build a fake content string with code blocks to feed into EditorPanel
+    const fakeContent = fileEntries.map(([name, file]) => {
+      const lang = file.language || name.split('.').pop() || '';
+      return '```' + lang + ':' + name + '\n' + file.content + '\n```';
+    }).join('\n\n');
+
+    EditorPanel.addFilesFromContent(fakeContent);
   }
 
   async function newProject() {
@@ -345,6 +459,9 @@ const AgentPage = (() => {
       return;
     }
     currentProject = project;
+    
+    // Reset editor panel for new project
+    EditorPanel.reset();
     
     const titleInput = document.querySelector('.title-input');
     if (titleInput) titleInput.value = project.title || '';
@@ -387,6 +504,11 @@ const AgentPage = (() => {
     renderMessages();
     updateProjectInfo();
     refreshSidebar();
+
+    // Populate editor with existing project files
+    setTimeout(() => {
+      populateEditorFromProject();
+    }, 100);
   }
 
   function renderMessages() {
@@ -438,6 +560,17 @@ const AgentPage = (() => {
       if (msg.content) {
         const contentDiv = document.createElement('div');
         contentDiv.innerHTML = formatMessageContent(msg.content);
+        // Wire up "Add to Editor" buttons
+        contentDiv.querySelectorAll('.agent-add-to-editor').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const blockId = btn.dataset.blockId;
+            const codeData = formatMessageContent._codeMap && formatMessageContent._codeMap[blockId];
+            if (codeData) {
+              addFileToEditor(codeData.filename, codeData.lang, codeData.code);
+            }
+          });
+        });
         bubble.appendChild(contentDiv);
       }
 
@@ -500,9 +633,28 @@ const AgentPage = (() => {
 
   function formatMessageContent(content) {
     let html = Components.escHtml(content);
-    // Format code blocks
+    // Format code blocks with "Add to Editor" button
     html = html.replace(/```(\w+):([^\n]+)\n([\s\S]*?)```/g, (match, lang, filename, code) => {
-      return `<div style="margin:8px 0;background:var(--code-bg);border:1px solid var(--border);border-radius:6px;overflow:hidden;"><div style="padding:8px;background:var(--bg3);border-bottom:1px solid var(--border);font-family:monospace;font-size:12px;color:var(--accent);">${Components.escHtml(filename)}</div><pre style="padding:12px;overflow-x:auto;margin:0;">${Components.escHtml(code)}</pre></div>`;
+      const safeFilename = Components.escHtml(filename);
+      const safeCode = Components.escHtml(code);
+      const safeLang = Components.escHtml(lang);
+      // Use a unique ID to reference the code instead of storing in data attribute
+      const blockId = 'cb_' + Math.random().toString(36).slice(2, 10);
+      // Store raw code in a map
+      if (!formatMessageContent._codeMap) formatMessageContent._codeMap = {};
+      formatMessageContent._codeMap[blockId] = { filename, lang, code };
+      return `<div class="agent-code-block" data-block-id="${blockId}" style="margin:8px 0;background:var(--code-bg);border:1px solid var(--border);border-radius:6px;overflow:hidden;"><div style="padding:8px 10px;background:var(--bg3);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;"><span style="font-family:monospace;font-size:12px;color:var(--accent);">📄 ${safeFilename}</span><button class="btn btn-secondary btn-sm agent-add-to-editor" data-block-id="${blockId}" style="font-size:10px;padding:2px 8px;">+ Add to Editor</button></div><pre style="padding:12px;overflow-x:auto;margin:0;">${safeCode}</pre></div>`;
+    });
+    // Format unnamed code blocks with "Add to Editor" button
+    html = html.replace(/```(\w+)\n([\s\S]*?)```/g, (match, lang, code) => {
+      if (match.includes('data-block-id')) return match; // Already processed above
+      const safeLang = Components.escHtml(lang);
+      const safeCode = Components.escHtml(code);
+      const autoFilename = `file_${Date.now()}.${lang || 'txt'}`;
+      const blockId = 'cb_' + Math.random().toString(36).slice(2, 10);
+      if (!formatMessageContent._codeMap) formatMessageContent._codeMap = {};
+      formatMessageContent._codeMap[blockId] = { filename: autoFilename, lang, code };
+      return `<div class="agent-code-block" data-block-id="${blockId}" style="margin:8px 0;background:var(--code-bg);border:1px solid var(--border);border-radius:6px;overflow:hidden;"><div style="padding:8px 10px;background:var(--bg3);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;"><span style="font-family:monospace;font-size:12px;color:var(--text2);">${safeLang} code block</span><button class="btn btn-secondary btn-sm agent-add-to-editor" data-block-id="${blockId}" style="font-size:10px;padding:2px 8px;">+ Add to Editor</button></div><pre style="padding:12px;overflow-x:auto;margin:0;">${safeCode}</pre></div>`;
     });
     // Format SEARCH/REPLACE blocks
     html = html.replace(/([^\n]+)\n<<<<<<< SEARCH\n([\s\S]*?)\n=======\n([\s\S]*?)\n>>>>>>> REPLACE/g, (match, file, search, replace) => {
@@ -715,8 +867,6 @@ const AgentPage = (() => {
 
         const stream = API.streamChat(provider, apiMessages, currentModel, {
           signal: abortController.signal,
-          temperature: 0.7,
-          maxTokens: 4096,
           tools: selectedTools,
           toolChoice: selectedTools ? 'auto' : undefined
         });
@@ -814,6 +964,11 @@ const AgentPage = (() => {
         createdFiles.push(trimmedPath);
       }
 
+      // Feed files into the EditorPanel
+      if (assistantMessage.files.length > 0) {
+        EditorPanel.addFilesFromContent(assistantMessage.content);
+      }
+
       // Try to write files using MCP tool
       if (assistantMessage.files.length > 0) {
         const mcpWriteSuccess = await writeFilesWithMCP(assistantMessage.files);
@@ -891,6 +1046,20 @@ ${filesPreview || 'No files yet'}
 
 TASKS COMPLETED: ${(currentProject.tasks || []).filter(t => t.done).length}/${(currentProject.tasks || []).length}
 `;
+  }
+
+  function addFileToEditor(filename, lang, code) {
+    // Show the editor pane if hidden
+    const editorPane = document.getElementById('agent-editor-pane');
+    const toggleBtn = document.getElementById('agent-editor-toggle');
+    if (editorPane && !editorPane.classList.contains('visible')) {
+      editorPane.classList.add('visible');
+      if (toggleBtn) toggleBtn.textContent = '💬 Chat';
+    }
+    // Build a code block string and feed to EditorPanel
+    const fakeContent = '```' + lang + ':' + filename + '\n' + code + '\n```';
+    EditorPanel.addFilesFromContent(fakeContent);
+    Components.toast(`Added ${filename} to editor`, 'success');
   }
 
   function clearMessages() {

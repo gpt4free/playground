@@ -477,11 +477,11 @@ const API = (() => {
       }
     }
 
-    const ordered = [];
-    if (type === 'anthropic') ordered.push('anthropic', 'openai', 'google', 'responses');
-    else if (type === 'google') ordered.push('google', 'openai', 'anthropic', 'responses');
-    else if (type === 'responses') ordered.push('responses', 'openai', 'anthropic', 'google');
-    else ordered.push('openai', 'anthropic', 'google', 'responses');
+    // const ordered = [];
+    // if (type === 'anthropic') ordered.push('anthropic', 'openai', 'google', 'responses');
+    // else if (type === 'google') ordered.push('google', 'openai', 'anthropic', 'responses');
+    // else if (type === 'responses') ordered.push('responses', 'openai', 'anthropic', 'google');
+    // else ordered.push('openai', 'anthropic', 'google', 'responses');
 
     const streamFns = {
       openai: streamChatOpenAI,
@@ -491,17 +491,15 @@ const API = (() => {
     };
 
     let firstError = imageFirstError;
-    for (const ep of ordered) {
+    // for (const ep of ordered) {
       try {
-        let yielded = false;
-        for await (const chunk of streamFns[ep](provider, messages, model, options)) {
-          yielded = true;
+        for await (const chunk of streamFns[type](provider, messages, model, options)) {
           yield chunk;
         }
         return;
       } catch (err) {
         if (err.name === 'AbortError') throw err;
-        if ([401, 402, 429].includes(err.status)) {
+        if ([401, 402].includes(err.status)) {
           throw err;
         }
         if (err.status === 400 && !isWrongEndpointError(err)) {
@@ -509,7 +507,7 @@ const API = (() => {
         }
         firstError = firstError || err;
       }
-    }
+    // }
 
     const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
     const prompt = lastUserMsg?.content || '';
