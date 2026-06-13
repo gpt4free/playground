@@ -211,7 +211,7 @@ const AppStorePage = (() => {
     } else {
         currentApp = { file, name };
     }
-    if (location.hash !== `#${currentApp.slug || currentApp.file}`) {
+    if (location.hash !== `#/${currentApp.slug || currentApp.file}`) {
         history.pushState(null, '', `#/${currentApp.slug || currentApp.file}`);
     }
     const grid = document.getElementById('appstore-grid');
