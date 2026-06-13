@@ -29,8 +29,19 @@ const Router = (() => {
       return;
     }
 
-    const handler = routes[base] || renderHome;
-    handler();
+    if (routes[base]) {
+      routes[base]();
+      return;
+    }
+
+    console.warn('No route found for hash:', segments);
+
+    if (segments[0]) {
+        renderPage('app-store', AppStorePage);AppStorePage.openApp(segments[0]);
+        return;
+    }
+
+    renderHome();
   }
 
   function renderPage(name, Page) {

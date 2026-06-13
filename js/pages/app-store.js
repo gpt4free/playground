@@ -2,6 +2,7 @@ const AppStorePage = (() => {
   const APPS_BASE = 'https://g4f.dev/apps/';
 
   const STATIC_APPS = [
+    { slug: 'dash', file: 'https://cdn.miniapps.ai/miniapps/91dfa307-8365-4707-be63-8717f55d8b92/1/index.html', name: 'G4F Quest Hub', icon: '<img src="https://cdn.miniapps.ai/cdn-cgi/image/w=32,h=32,fit=cover/images/tools/91dfa307-8365-4707-be63-8717f55d8b92/logo-d12e5351-3c40-4022-a309-b263a1430b9e.png">', desc: 'Gamification Dashboard for GPT4Free' },
     { file: '2048_game.html', name: '2048 Game', icon: '🧩', desc: 'Classic sliding tile puzzle' },
     // { file: 'anondrop-streamer.html', name: 'AnonDrop Streamer', icon: '📡', desc: 'Anonymous file streaming tool' },
     { file: 'api_tester_like_postman-lite.html', name: 'API Tester', icon: '🔧', desc: 'Lightweight Postman-like API client' },
@@ -59,6 +60,7 @@ const AppStorePage = (() => {
         data.items.forEach(item => {
           if (item.id) {
             dynamicApps.push({
+              slug: item.slug,
               file: `https://cdn.miniapps.ai/miniapps/${item.id}/${item.revision}/index.html?lang=en`,
               name: item.title,
               icon: `<img src="https://cdn.miniapps.ai/cdn-cgi/image/w=32,h=32,fit=cover/${item.logo}" alt="${item.title}" style="width:32px;height:32px;">`,
@@ -129,9 +131,13 @@ const AppStorePage = (() => {
     }
   }
 
+  async function getAllApps() {
+    await loadDynamicApps();
+    return STATIC_APPS.concat(dynamicApps);
+  }
+
   async function updateAppList(filter = '') {
-    await loadDynamicApps(filter);
-    const allApps = [...STATIC_APPS.map(a=>({...a, file: a.file.startsWith('http') ? a.file : APPS_BASE + a.file})), ...dynamicApps];
+    const allApps = await getAllApps();
     const q = filter.toLowerCase();
     const filtered = allApps.filter(a =>
       !q || a.name.toLowerCase().includes(q) || a.desc.toLowerCase().includes(q)
@@ -188,7 +194,7 @@ const AppStorePage = (() => {
     const grid = document.getElementById('appstore-grid');
     if (!grid) return;
     grid.innerHTML = apps.map(a => `
-      <div class="appstore-card" onclick="AppStorePage.openApp('${a.file}','${a.name.replace(/'/g, "\\'")}')"
+      <div class="appstore-card" onclick="AppStorePage.openApp('${a.slug || a.file}','${(a.name||'').replace(/'/g, "\\'")}')"
         style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px;cursor:pointer;display:flex;flex-direction:column;gap:8px;transition:border-color .15s,transform .15s,box-shadow .15s;"
         onmouseenter="this.style.borderColor='var(--accent-border)';this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 24px rgba(0,0,0,0.3)'"
         onmouseleave="this.style.borderColor='var(--border)';this.style.transform='';this.style.boxShadow=''">
@@ -199,8 +205,15 @@ const AppStorePage = (() => {
     `).join('');
   }
 
-  function openApp(file, name) {
-    currentApp = { file, name };
+  async function openApp(file, name) {
+    if (!file.startsWith('http')) {
+        currentApp = await getAllApps().then(apps => apps.find(a => a.file === file || a.slug === file));
+    } else {
+        currentApp = { file, name };
+    }
+    if (location.hash !== `#${currentApp.slug || currentApp.file}`) {
+        history.pushState(null, '', `#/${currentApp.slug || currentApp.file}`);
+    }
     const grid = document.getElementById('appstore-grid');
     const iframeView = document.getElementById('appstore-iframe-view');
     const iframe = document.getElementById('appstore-iframe');
@@ -227,10 +240,9 @@ const AppStorePage = (() => {
     if (grid) grid.style.display = 'none';
     if (search) search.style.display = 'none';
     if (iframeView) iframeView.style.display = 'flex';
-    if (title) title.textContent = name;
-    if (openLink) openLink.href = file;
-    if (iframe) iframe.src = file; //+ '#' + hashParams.toString();
-
+    if (title) title.textContent = currentApp.name;
+    if (openLink) openLink.href = currentApp.file;
+    if (iframe) iframe.src = currentApp.file.startsWith('http') ? currentApp.file : APPS_BASE + currentApp.file;
     // window.__tempApiKey = tempApiKey;
   }
 
