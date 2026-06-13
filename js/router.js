@@ -112,7 +112,7 @@ const Router = (() => {
           </a>`).join('')}
       </div>
       <div class="home-foot">
-        ${framework.translate('Open source')} · <a href="https://github.com/meow18838/LLMPlayground">GitHub</a> · <a href="#/providers">${framework.translate('Sign in with Airforce')}</a>
+        ${framework.translate('Open source')} · <a href="https://github.com/meow18838/LLMPlayground">GitHub</a> · <a href="#/providers">${["https://g4f.dev", "http://localhost:8080", "http://localhost:1337", "https://gpt4free.github.io"].includes(location.origin) ? 'Powered by <a href="https://g4f.dev">g4f.dev</a>' : framework.translate('Sign in with Airforce')}</a>
       </div>`;
     ProvidersPage.updateBadge();
     framework.translateElements(container.querySelectorAll('*'));
