@@ -160,7 +160,7 @@ const AppStorePage = (() => {
     header.innerHTML = `
       <h2 style="font-size:17px;font-weight:700;letter-spacing:-0.02em;flex:1;">🛒 ${framework.translate('App Store')}</h2>
       <input type="text" id="appstore-search" placeholder="${framework.translate('Search apps…')}" 
-        style="width:220px;padding:7px 12px;font-size:13px;border-radius:8px;background:var(--bg3);border:1px solid var(--border);color:var(--text);outline:none;"
+        style="width:192px;padding:7px 12px;font-size:13px;border-radius:8px;background:var(--bg3);border:1px solid var(--border);color:var(--text);outline:none;"
         oninput="AppStorePage.filterApps(this.value)">
     `;
     wrapper.appendChild(header);
@@ -178,6 +178,7 @@ const AppStorePage = (() => {
         <button class="btn btn-sm btn-secondary" onclick="AppStorePage.closeApp()">← ${framework.translate('Back')}</button>
         <span id="appstore-iframe-title" style="font-weight:600;font-size:14px;flex:1;"></span>
         <a id="appstore-iframe-open" href="#" target="_blank" class="btn btn-sm btn-secondary" title="${framework.translate('Open in new tab')}">↗</a>
+        <button id="appstore-iframe-fullscreen" class="btn btn-sm btn-secondary" title="${framework.translate('Fullscreen')}" onclick="AppStorePage.toggleFullscreen()">⛶</button>
       </div>
       <iframe id="appstore-iframe" style="flex:1;width:100%;border:none;" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"></iframe>
     `;
@@ -207,13 +208,21 @@ const AppStorePage = (() => {
   }
 
   async function openApp(file, name) {
-    if (!file.startsWith('http')) {
+    console.log('Opening app:', file);
+    if (!file) return;
+    let currentApp = null;
+    if (file === 'community') {
+        const appUrl = `${Router.isKnownOrigin() ? location.origin : 'https://g4f.dev'}/community.html`;
+        currentApp = { slug: file, file: appUrl, name: framework.translate('Community') };
+    } else if (!file.startsWith('http')) {
         currentApp = await getAllApps().then(apps => apps.find(a => a.file === file || a.slug === file));
-    } else {
+    }
+    if (!currentApp) {
         currentApp = { file, name };
     }
-    if (location.hash !== `#/${currentApp.slug || currentApp.file}`) {
-        history.pushState(null, '', `#/${currentApp.slug || currentApp.file}`);
+    const newSlugOrFile = currentApp.slug || currentApp.file;
+    if (!newSlugOrFile.startsWith('http') && location.hash !== `#/${newSlugOrFile}`) {
+        history.pushState(null, '', `#/${newSlugOrFile}`);
     }
     const grid = document.getElementById('appstore-grid');
     const iframeView = document.getElementById('appstore-iframe-view');
@@ -242,9 +251,10 @@ const AppStorePage = (() => {
     if (search) search.style.display = 'none';
     if (iframeView) iframeView.style.display = 'flex';
     if (title) title.textContent = currentApp.name;
-    if (openLink) openLink.href = currentApp.file;
     const appBase = `${Router.isKnownOrigin() ? location.origin : 'https://g4f.dev'}/apps/`;
-    if (iframe) iframe.src = currentApp.file.startsWith('http') ? currentApp.file : appBase + currentApp.file;
+    const appUrl = currentApp.file.startsWith('http') ? currentApp.file : appBase + currentApp.file;
+    if (iframe) iframe.src = appUrl;
+    if (openLink) openLink.href = appUrl;
     // window.__tempApiKey = tempApiKey;
   }
 
@@ -261,5 +271,20 @@ const AppStorePage = (() => {
     if (iframe) iframe.src = '';
   }
 
-  return { render, openApp, closeApp, filterApps };
+  function toggleFullscreen() {
+    const iframeView = document.getElementById('appstore-iframe-view');
+    const btn = document.getElementById('appstore-iframe-fullscreen');
+    if (!iframeView) return;
+    if (iframeView.classList.contains('appstore-fullscreen')) {
+      iframeView.classList.remove('appstore-fullscreen');
+      iframeView.style.cssText = 'display:flex;flex:1;flex-direction:column;overflow:hidden;';
+      if (btn) btn.textContent = '⛶';
+    } else {
+      iframeView.classList.add('appstore-fullscreen');
+      iframeView.style.cssText = 'display:flex;flex-direction:column;overflow:hidden;position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:9999;background:var(--bg);';
+      if (btn) btn.textContent = '⛶';
+    }
+  }
+
+  return { render, openApp, closeApp, filterApps, toggleFullscreen };
 })();

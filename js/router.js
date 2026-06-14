@@ -11,6 +11,11 @@ const Router = (() => {
     '/personas': renderPersonas,
     '/providers': () => renderPage('providers', ProvidersPage),
     '/app-store': () => renderPage('app-store', AppStorePage),
+    '/community': () => { 
+      renderPage('app-store', AppStorePage);
+      AppStorePage.openApp('community', 'Community');
+      AppStorePage.toggleFullscreen();
+    },
   };
 
   function getHash() {
@@ -111,8 +116,9 @@ const Router = (() => {
           { icon: '🧑‍🎨', title: 'Personas', desc: 'Create, edit and manage your own AI characters', route: '/personas' },
           { icon: '⚙️', title: 'Providers', desc: 'Bring any OpenAI-compatible API — Airforce API works out of the box, no key needed', route: '/providers' },
           { icon: '🛒', title: 'App Store', desc: 'Browse and launch 40+ mini web apps — games, tools, utilities and more', route: '/app-store' },
+          { icon: '🌐', title: 'Community', desc: 'Join the g4f community — ask questions, share ideas, and connect with other users', route: '/community', external: true },
         ].map(item => `
-          <a href="#${item.route}" class="home-card">
+          <a href="${item.external ? item.route : '#' + item.route}" class="home-card"${item.external ? ' target="_blank" rel="noopener"' : ''}>
             <div class="hc-icon">${item.icon}</div>
             <div class="hc-title">${item.title}</div>
             <div class="hc-desc">${item.desc}</div>
