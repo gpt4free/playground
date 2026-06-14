@@ -32,7 +32,7 @@ const Store = (() => {
       }
       delete data.providers.custom;
       Store.setProviders(Object.values(data.providers));
-      Store.setActiveProviderId(data.providers['api.airforce'] ? 'api.airforce' : Object.keys(data.providers)[0]);
+      Store.setActiveProviderId(!Router.isKnownOrigin() ? 'api.airforce' : Object.keys(data.providers)[0]);
       ProvidersPage.renderList();
     });
   }

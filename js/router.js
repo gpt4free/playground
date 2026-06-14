@@ -17,6 +17,10 @@ const Router = (() => {
     return location.hash.slice(1) || '/';
   }
 
+  function isKnownOrigin() {
+    return KNOWN_ORIGINS.includes(location.origin);
+  }
+
   function navigate() {
     const hash = getHash();
     const segments = hash.split('/').filter(Boolean);
@@ -142,7 +146,7 @@ const Router = (() => {
     }).finally(() => navigate());
   }
 
-  return { init, navigate };
+  return { init, navigate, isKnownOrigin };
 })();
 
 const PlaygroundAuth = (() => {

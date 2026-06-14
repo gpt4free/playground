@@ -332,10 +332,6 @@ const AgentPage = (() => {
       document.head.appendChild(s);
     }
 
-    const contentContainer = document.createElement('div');
-    contentContainer.style.cssText = 'flex:1;display:flex;flex-direction:column;min-height:0;';
-    contentContainer.appendChild(inputArea);
-
     main.appendChild(toolbar);
     main.appendChild(codingLayout);
 
