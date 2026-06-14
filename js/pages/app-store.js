@@ -17,6 +17,7 @@ const AppStorePage = (() => {
     { file: 'file-drop_image_compressor.html', name: 'Image Compressor', icon: '🖼️', desc: 'Drop images to compress' },
     { file: 'flappy_bird_clone.html', name: 'Flappy Bird', icon: '🐦', desc: 'Classic flappy bird clone' },
     { file: 'flashcard_learning_app.html', name: 'Flashcards', icon: '🃏', desc: 'Study with flashcard decks' },
+    { file: 'hls-player.html', name: 'HLS Player', icon: '🎵', desc: 'Play HLS music streams' },
     { file: 'hangman_game.html', name: 'Hangman', icon: '🎯', desc: 'Word guessing game' },
     { file: 'interactivequizplatform.html', name: 'Quiz Platform', icon: '❓', desc: 'Interactive quiz builder' },
     { file: 'interactiveto-dolistwithdrag-and-drop.html', name: 'Todo List', icon: '✅', desc: 'Drag & drop to-do list' },
@@ -242,7 +243,8 @@ const AppStorePage = (() => {
     if (iframeView) iframeView.style.display = 'flex';
     if (title) title.textContent = currentApp.name;
     if (openLink) openLink.href = currentApp.file;
-    if (iframe) iframe.src = currentApp.file.startsWith('http') ? currentApp.file : APPS_BASE + currentApp.file;
+    const appBase = `${Router.isKnownOrigin() ? location.origin : 'https://g4f.dev'}/apps/`;
+    if (iframe) iframe.src = currentApp.file.startsWith('http') ? currentApp.file : appBase + currentApp.file;
     // window.__tempApiKey = tempApiKey;
   }
 
