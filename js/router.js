@@ -39,7 +39,8 @@ const Router = (() => {
     console.warn('No route found for hash:', segments);
 
     if (segments[0]) {
-        renderPage('app-store', AppStorePage);AppStorePage.openApp(segments[0]);
+        renderPage('app-store', AppStorePage);
+        AppStorePage.openApp(hash.substring(1));
         return;
     }
 

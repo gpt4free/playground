@@ -118,7 +118,7 @@ const AppStorePage = (() => {
         const name = m.path.split('/')[0].replace(/\.html?$/, '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
         const icon = '📦';
         const desc = `App from ${m.path}`;
-        return { file: file.href, name, icon, desc };
+        return { slug: m.path, file: file.href, name, icon, desc };
       });
       const existingFiles = new Set(dynamicApps.map(a => a.file));
       newApps.forEach(app => {

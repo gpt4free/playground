@@ -279,11 +279,6 @@ const AgentPage = (() => {
     messagesDiv.className = 'chat-messages';
     messagesDiv.style.cssText = 'flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px;display:flex;flex-direction:column;gap:12px;';
 
-    const workspace = document.createElement('div');
-    workspace.id = 'agent-workspace';
-    workspace.style.cssText = 'display:flex;flex-direction:column;';
-    workspace.appendChild(messagesDiv);
-
     const inputArea = document.createElement('div');
     inputArea.className = 'chat-input-area';
     inputArea.style.cssText = 'padding:12px 16px;border-top:1px solid var(--border);gap:10px;display:flex;flex-direction:column;';
@@ -339,10 +334,7 @@ const AgentPage = (() => {
 
     const contentContainer = document.createElement('div');
     contentContainer.style.cssText = 'flex:1;display:flex;flex-direction:column;min-height:0;';
-    contentContainer.appendChild(workspace);
     contentContainer.appendChild(inputArea);
-    const editorPane = buildEditorPane();
-    workspace.appendChild(editorPane);
 
     main.appendChild(toolbar);
     main.appendChild(codingLayout);

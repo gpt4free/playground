@@ -211,6 +211,22 @@
           // --------------------------------------------------------------
           //  ✈  AI CALLS  (≥  miniapp-ai-request → callModel)
           // --------------------------------------------------------------
+          if (message.type === "miniapp-tts-request") {
+            if (message.action === "speak") {
+              const text = message.payload?.text;
+              if (!text) {
+                resolve({ success: false, error: { code: "INVALID_REQUEST", message: "Missing text" } });
+                return;
+              }
+              const audio = new Audio();
+              audio.oncanplay = () => audio.play();
+              audio.onerror = () => resolve({ success: false, error: { code: "TTS_FAILED", message: "Audio playback failed" } });
+              audio.onended = () => resolve({ success: true, result: null });
+              audio.src =  "https://g4f.space/ai/audio/" + encodeURIComponent(text);
+              return;
+            }
+          }
+
           if (message.type === "miniapp-ai-request") {
             if (message.action === "callModel") {
               console.log("[MiniappsAI] AI request received:", message);
@@ -254,9 +270,15 @@
               };
 
               const g4fSession = localStorage.getItem("g4f_session");
-
-              if (["239ecbe1-5434-47b9-81b5-492f2fab7cf7"].includes(modelId)) {
-                const prompt = await materialize();
+              let prompt = "";
+              if (payload.messages && payload.messages.length > 0) {
+                const content = payload.messages[0].content || "";
+                if (Array.isArray(content)) {
+                  prompt = content.find(c => c.inputKey === "prompt")?.text || "";
+                }
+              }
+              if (prompt || ["239ecbe1-5434-47b9-81b5-492f2fab7cf7"].includes(modelId)) {
+                prompt = prompt || await materialize();
                 fetch("https://g4f.space/api/gen.pollinations/images/generations", {
                     method: "POST",
                     headers: {
