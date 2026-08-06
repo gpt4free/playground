@@ -595,7 +595,7 @@ const API = (() => {
     for (const call of calls) {
       const normalized = normalizeToolCall(call);
       if (!normalized) continue;
-      const key = normalized.index;
+      const key = "index" in normalized ? `${normalized.index || 0}` : `${normalized.id || 0}`;
       if (!accumulator[key]) {
         accumulator[key] = normalized;
         continue;
