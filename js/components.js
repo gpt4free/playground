@@ -402,6 +402,32 @@ const Components = (() => {
       rerenderList = null;
     }
 
+    function getFavorites() {
+      try {
+        const raw = localStorage.getItem('playground_favorites');
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    }
+
+    function setFavorites(favs) {
+      try {
+        localStorage.setItem('playground_favorites', JSON.stringify(favs));
+      } catch {}
+    }
+
+    function toggleFavorite(modelId) {
+      const favs = getFavorites();
+      const idx = favs.indexOf(modelId);
+      if (idx >= 0) favs.splice(idx, 1);
+      else favs.push(modelId);
+      setFavorites(favs);
+      rerenderList?.();
+    }
+
     function open() {
       overlay = document.createElement('div');
       overlay.className = 'modal-overlay';
@@ -415,11 +441,15 @@ const Components = (() => {
 
       function renderList(filter = '') {
         const q = filter.trim().toLowerCase();
+        const favs = getFavorites();
+        const favoriteModels = models.filter(m => favs.includes(m.id));
+        const rest = models.filter(m => !favs.includes(m.id));
         const filtered = q
           ? models.filter(m => String(m.label).toLowerCase().includes(q) || String(m.id).toLowerCase().includes(q))
           : models;
-        list.innerHTML = filtered.length
-          ? filtered.map(m => `<button type="button" class="mp-item${m.id === value ? ' selected' : ''}" data-id="${escHtml(m.id)}">${escHtml(m.label)}</button>`).join('')
+        const ordered = q ? filtered : [...favoriteModels, ...rest];
+        list.innerHTML = ordered.length
+          ? ordered.map(m => `<button type="button" class="mp-item${m.id === value ? ' selected' : ''}" data-id="${escHtml(m.id)}"><span style="flex:1;text-align:left">${escHtml(m.label)}</span><span class="mp-fav" data-fav="${escHtml(m.id)}">${favs.includes(m.id) ? '★' : '☆'}</span></button>`).join('')
           : `<div class="mp-empty">${framework.translate('No models found')}</div>`;
       }
       rerenderList = () => renderList(searchInput.value);
@@ -431,6 +461,12 @@ const Components = (() => {
         if (e.key === 'Enter') { e.preventDefault(); list.querySelector('.mp-item')?.click(); }
       });
       list.addEventListener('click', e => {
+        const favBtn = e.target.closest('.mp-fav');
+        if (favBtn) {
+          e.stopPropagation();
+          toggleFavorite(favBtn.dataset.fav);
+          return;
+        }
         const item = e.target.closest('.mp-item');
         if (!item) return;
         value = item.dataset.id;
@@ -614,9 +650,10 @@ const Components = (() => {
       .mp-modal { display: flex; flex-direction: column; gap: 10px; padding: 14px; overflow: hidden; }
       .mp-search { padding: 10px 14px; flex-shrink: 0; width: 100%; }
       .mp-list { overflow-y: auto; max-height: min(58vh, 460px); display: flex; flex-direction: column; gap: 1px; }
-      .mp-item { text-align: left; background: none; border: none; color: var(--text); padding: 9px 10px; border-radius: 8px; font-size: 13px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; }
+      .mp-item { text-align: left; background: none; border: none; color: var(--text); padding: 9px 10px; border-radius: 8px; font-size: 13px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; display:flex; align-items:center; gap:8px; }
       .mp-item:hover { background: var(--bg3); }
       .mp-item.selected { background: var(--accent-soft); color: var(--accent); }
+      .mp-fav { color:var(--accent); font-size:16px; line-height:1; padding:0 4px; }
       .mp-empty { padding: 14px; color: var(--text2); font-size: 12px; text-align: center; }
       .chat-toolbar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--border); background: var(--glass); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); flex-wrap: wrap; flex-shrink: 0; }
       .chat-toolbar .title-input { background: none; border: none; font-size: 15px; font-weight: 600; color: var(--text); flex: 1; min-width: 100px; padding: 6px 8px; border-radius: 8px; }

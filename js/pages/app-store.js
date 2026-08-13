@@ -86,7 +86,7 @@ const AppStorePage = (() => {
       }
       
       // Find file search tools
-      const searchTools = tools.filter(t => t.name==='file_search');
+      const searchTools = tools.filter(t => t.name==='file_search_glob');
       console.log('Available file search tools:', searchTools);
       if (searchTools.length === 0) {
         console.warn('No file search tool found in MCP');
@@ -97,11 +97,10 @@ const AppStorePage = (() => {
       const toolCalls = [{
         id: `file_search_${Date.now()}`,
         function: {
-            name: 'file_search',
+            name: 'file_search_glob',
             arguments: {
-              recursive: true,
               max_results: 200,
-              pattern: '*.html',
+              query: '**/*.html',
             }
           }
       }];
@@ -115,11 +114,11 @@ const AppStorePage = (() => {
 
       const serverUrl = (mcpClient.servers.filter(s => s.enabled) || [null])[0]?.url;    
       const newApps = (JSON.parse(results[0].content).matches || []).map(m => {
-        const file = new URL("/pa/files/" + m.path, serverUrl);
-        const name = m.path.split('/')[0].replace(/\.html?$/, '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        const file = new URL("/pa/files/" + m, serverUrl);
+        const name = m.split('/')[0].replace(/\.html?$/, '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
         const icon = '📦';
-        const desc = `App from ${m.path}`;
-        return { slug: m.path, file: file.href, name, icon, desc };
+        const desc = `App from ${m}`;
+        return { slug: m, file: file.href, name, icon, desc };
       });
       const existingFiles = new Set(dynamicApps.map(a => a.file));
       newApps.forEach(app => {

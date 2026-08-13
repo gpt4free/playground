@@ -236,6 +236,9 @@ const API = (() => {
   async function fetchModels(provider) {
     const type = provider.endpointType || provider.type || 'openai';
 
+    if (provider.paProvider) {
+      return fetchModelsPA(provider);
+    }
     if (type === 'anthropic') {
       return fetchModelsAnthropic(provider);
     }
@@ -249,6 +252,20 @@ const API = (() => {
     if (!res.ok) throw new Error(`Failed to fetch models: ${res.status}`);
     const data = await res.json();
     return (data.data || data.models || []).filter(m => m.id || m);
+  }
+
+  async function fetchModelsPA(provider) {
+    if (Array.isArray(provider.paModels)) {
+      return provider.paModels.map(id => ({ id, label: id }));
+    }
+    const baseUrl = (provider.baseUrl || '').replace(/\/$/, '');
+    const headers = { 'Content-Type': 'application/json' };
+    if (provider.apiKey) headers['Authorization'] = `Bearer ${provider.apiKey}`;
+    const res = await fetchWithRetry(`${baseUrl}/models`, { headers });
+    if (!res.ok) throw new Error(`Failed to fetch PA models: ${res.status}`);
+    const data = await res.json();
+    const models = (data.data || data.models || []).filter(m => m.id || m);
+    return models;
   }
 
   async function fetchModelsAnthropic(provider) {

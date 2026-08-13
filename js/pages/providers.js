@@ -172,6 +172,7 @@ const ProvidersPage = (() => {
         <button class="btn btn-secondary btn-sm" data-tab="live">Live</button>
         <button class="btn btn-secondary btn-sm" data-tab="custom">Custom</button>
         <button class="btn btn-secondary btn-sm" data-tab="core">Core</button>
+        <button class="btn btn-secondary btn-sm" data-tab="pa">PA Providers</button>
       </div>
       <div id="add-from-list-body" style="display:flex;flex-direction:column;gap:10px;max-height:420px;overflow:auto"></div>
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
@@ -305,6 +306,12 @@ const ProvidersPage = (() => {
           });
           body.appendChild(row);
         });
+      } else if (tab === 'pa') {
+        body.innerHTML = '<div style="color:var(--text2)">Loading PA providers...</div>';
+        const providers = await renderPATab(body, close);
+        if (!providers.length) {
+          body.innerHTML = '<div style="color:var(--text2)">No PA providers found.</div>';
+        }
       }
     }
 
@@ -316,8 +323,9 @@ const ProvidersPage = (() => {
       });
     });
 
-    // default to core tab
-    modal.querySelector('button[data-tab="core"]').click();
+    // default to first available tab
+    const firstTab = modal.querySelector('button[data-tab="live"], button[data-tab="custom"], button[data-tab="core"], button[data-tab="pa"]');
+    if (firstTab) firstTab.click();
   }
 
   function renderList() {
@@ -773,6 +781,66 @@ const ProvidersPage = (() => {
         button.disabled = false;
         button.textContent = 'Refresh Tools';
       }
+    }
+  }
+
+  async function renderPATab(container, close) {
+    const providers = await loadPAProviders();
+    container.innerHTML = '';
+    if (!providers.length) {
+      container.innerHTML = '<div style="color:var(--text2)">No PA providers found.</div>';
+      return [];
+    }
+    providers.forEach(p => {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--bg3)';
+      row.innerHTML = `
+        <div style="min-width:0">
+          <div style="font-weight:600" class="notranslate">${Components.escHtml(p.name || p.id || 'PA Provider')} - ${Components.escHtml(p.label || '')}</div>
+          <div style="font-size:12px;color:var(--text2);word-break:break-all" class="notranslate">${Array.isArray(p.models) ? p.models.join(', ') : ''}</div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-primary btn-sm" data-action="add-pa" data-pa-id="${Components.escHtml(p.id || p.name)}">Add</button>
+        </div>`;
+      row.querySelector('[data-action="add-pa"]').addEventListener('click', async () => {
+        const created = {
+          id: Store.newId(),
+          name: p.label,
+          baseUrl: `${framework.backendUrl}/api/pa:${encodeURIComponent(p.id || p.name)}`,
+          apiKey: '',
+          endpointType: 'openai',
+          paProvider: p.id || p.name,
+          paModels: Array.isArray(p.models) ? p.models : [],
+        };
+        Store.upsertProvider(created);
+        Store.setActiveProviderId(created.id);
+        try {
+          const fetched = await API.fetchModels(Store.applyProviderConfig(created));
+          if (fetched.length) {
+            created.fetchedModels = fetched;
+            if (!created.defaultModel) created.defaultModel = fetched[0].id || fetched[0];
+            Store.upsertProvider(created);
+          }
+        } catch {}
+        renderList();
+        updateBadge();
+        Components.toast('PA provider added', 'success');
+        if (typeof close === 'function') close();
+      });
+      container.appendChild(row);
+    });
+    return providers;
+  }
+
+  async function loadPAProviders() {
+    try {
+      const url = `${framework.backendUrl}/pa/providers`;
+      const res = await fetch(url);
+      if (!res.ok) return [];
+      const data = await res.json();
+      return Array.isArray(data) ? data : (Array.isArray(data.providers) ? data.providers : []);
+    } catch {
+      return [];
     }
   }
 
