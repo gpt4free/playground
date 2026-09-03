@@ -99,7 +99,7 @@ const Router = (() => {
     container.innerHTML = `
       <div class="home-hero">
         <div class="eyebrow notranslate">✦ ${framework.translate('Free & open source')}</div>
-        <h1 class="notranslate">LLMPlayground</h1>
+        <h1 class="notranslate">Playground</h1>
         <p>${framework.translate('Chat with any model, browse 237k+ characters, roleplay, and code — in one fast, open playground.')}</p>
         <div class="home-cta">
           <a href="#/chat" class="btn btn-primary">${framework.translate('Start chatting')}</a>
@@ -401,8 +401,8 @@ const PlaygroundAuth = (() => {
   }
 
   function showLoginModal() {
-    const isLLMPlayground = document.location.hostname === 'llmplayground.net';
-    const providers = isLLMPlayground
+    const isPlayground = document.location.hostname === 'llmplayground.net';
+    const providers = isPlayground
       ? [{ id: 'airforce', label: 'Airforce' }]
       : [
           { id: 'github', label: 'GitHub' },
@@ -420,7 +420,7 @@ const PlaygroundAuth = (() => {
     modal.className = 'modal';
 
     modal.innerHTML = `
-      <h2 style="margin-bottom:8px">${framework.translate('Sign in to LLMPlayground')}</h2>
+      <h2 style="margin-bottom:8px">${framework.translate('Sign in to Playground')}</h2>
       <p style="font-size:13px;color:var(--text2);margin-bottom:16px;line-height:1.5">${Router.isKnownOrigin() ? 'Powered by <a href="https://g4f.dev">g4f.dev</a>' : framework.translate('Sign in with Airforce to use the models in your plan — usage is billed to your account. Other providers unlock member access tokens and API keys.')}</p>
       <div style="display:flex;flex-direction:column;gap:8px;">
         ${providers.map(p => `<button class="btn btn-secondary" data-auth-provider="${p.id}">${p.label}</button>`).join('')}
