@@ -1,8 +1,8 @@
 
 
 function btnTranslate(btn) {
-    if (localStorage.getItem(framework.translationKey)) {
-        localStorage.removeItem(framework.translationKey);
+    if (framework.getSelectedLanguage && framework.getSelectedLanguage()) {
+        deleteTranslations();
         window.location.reload();
         return;
     }
