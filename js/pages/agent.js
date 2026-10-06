@@ -648,6 +648,44 @@ const AgentPage = (() => {
     html = html.replace(/([^\n]+)\n<<<<<<< SEARCH\n([\s\S]*?)\n=======\n([\s\S]*?)\n>>>>>>> REPLACE/g, (match, file, search, replace) => {
       return `<div style="margin:8px 0;background:var(--code-bg);border:1px solid var(--border);border-radius:6px;overflow:hidden;"><div style="padding:8px;background:var(--bg3);border-bottom:1px solid var(--border);font-family:monospace;font-size:12px;color:var(--accent);">${Components.escHtml(file.trim())}</div><pre style="padding:12px;overflow-x:auto;margin:0;"><span style="color:var(--red);">- ${Components.escHtml(search.trim())}</span><br/><span style="color:var(--green);">+ ${Components.escHtml(replace.trim())}</span></pre></div>`;
     });
+    // Format Tool Results into expandable inspector cards
+    html = html.replace(/✅ \*\*([^*]+)\*\*:\s*([\s\S]*?)(?=(?:✅ \*\*|$))/g, (match, toolName, body) => {
+      const cleanName = Components.escHtml(toolName.trim());
+      const cleanBody = body.trim();
+      const lines = cleanBody.split('\n');
+      const isLong = lines.length > 12 || cleanBody.length > 600;
+      const previewText = isLong ? lines.slice(0, 10).join('\n') : cleanBody;
+      const uid = 'pg_res_' + Math.random().toString(36).slice(2, 9);
+
+      let bodyHtml = '';
+      if (!isLong) {
+        bodyHtml = `<div style="padding:10px;font-family:monospace;font-size:12px;background:var(--code-bg);white-space:pre-wrap;word-break:break-word;">${cleanBody}</div>`;
+      } else {
+        bodyHtml = `
+          <div id="short_${uid}" style="padding:10px;font-family:monospace;font-size:12px;background:var(--code-bg);white-space:pre-wrap;word-break:break-word;">
+            ${previewText}
+            <div style="margin-top:6px;padding-top:6px;border-top:1px dashed var(--border);display:flex;justify-content:space-between;font-size:11px;color:var(--text2);">
+              <span>Output truncated (${lines.length} lines)</span>
+              <button class="btn btn-secondary btn-sm" style="font-size:10px;padding:2px 8px;" onclick="document.getElementById('short_${uid}').style.display='none';document.getElementById('full_${uid}').style.display='block';">Show full output (${lines.length} lines) ▾</button>
+            </div>
+          </div>
+          <div id="full_${uid}" style="display:none;padding:10px;font-family:monospace;font-size:12px;background:var(--code-bg);white-space:pre-wrap;word-break:break-word;">
+            ${cleanBody}
+            <div style="margin-top:6px;padding-top:6px;border-top:1px dashed var(--border);display:flex;justify-content:flex-end;">
+              <button class="btn btn-secondary btn-sm" style="font-size:10px;padding:2px 8px;" onclick="document.getElementById('full_${uid}').style.display='none';document.getElementById('short_${uid}').style.display='block';">Collapse output ▴</button>
+            </div>
+          </div>
+        `;
+      }
+
+      return `<div class="agent-tool-card" style="margin:8px 0;background:var(--bg3);border:1px solid var(--accent-border);border-left:3px solid var(--green);border-radius:6px;overflow:hidden;">
+        <div style="padding:6px 12px;background:rgba(0,0,0,0.2);font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;" onclick="const b=this.nextElementSibling;b.style.display=b.style.display==='none'?'block':'none';">
+          <span style="color:var(--green);"><i class="fa-solid fa-square-check"></i> Tool: ${cleanName}</span>
+          <span style="font-size:11px;color:var(--text2);font-weight:normal;">Inspect Output ▾</span>
+        </div>
+        ${bodyHtml}
+      </div>`;
+    });
     return html;
   }
 
