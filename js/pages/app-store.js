@@ -104,16 +104,27 @@ const AppStorePage = (() => {
             }
           }
       }];
-      
-      // Execute the tool calls
-      const results = await mcpClient.executeToolCalls(toolCalls);
-      if (!results || results.length === 0) {
-        console.warn('No results from MCP tool execution');
-        return false;
-      }
+
+      let result = await window.mcpClient.executeToolCalls(toolCalls);
+      result = result.map(result => {
+          try {
+              const content = Array.isArray(result.content) ? result.content : [{text: result.content}];
+              const matches = []
+              for (const c of content) {
+                  if (c.text) {
+                      const data = JSON.parse(c.text);
+                      matches.push(...(data.matches || []));
+                  }
+              }
+              return matches;
+          } catch (e) {
+              console.warn('No results from MCP tool execution');
+              return [];
+          }
+      });
 
       const serverUrl = (mcpClient.servers.filter(s => s.enabled) || [null])[0]?.url;    
-      const newApps = (JSON.parse(results[0].content).matches || []).map(m => {
+      const newApps = result.flat().map(m => {
         const file = new URL("/pa/files/" + m, serverUrl);
         const name = m.split('/')[0].replace(/\.html?$/, '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
         const icon = '📦';

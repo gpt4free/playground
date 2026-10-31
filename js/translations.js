@@ -2,7 +2,7 @@
 
 function btnTranslate(btn) {
     if (framework.getSelectedLanguage && framework.getSelectedLanguage()) {
-        deleteTranslations();
+        framework.deleteAllTranslations();
         window.location.reload();
         return;
     }
