@@ -336,7 +336,13 @@ const ChatPage = (() => {
           fullContent += Components.formatToolCalls(toolCalls);
           try {
             const toolResults = await API.executeToolCalls(toolCalls);
-            const resultsText = toolResults.map(result => `\n\n✅ **Tool Result:** \`${result.name}\`\n\`\`\`json\n${JSON.stringify(JSON.parse(result.content), null, 2)}\n\`\`\``).join('\n\n');
+            const resultsText = toolResults.map(result => {
+              let formatted = result.content;
+              try {
+                formatted = JSON.stringify(JSON.parse(result.content), null, 2);
+              } catch {}
+              return `\n\n✅ **Tool Result:** \`${result.name}\`\n\`\`\`json\n${formatted}\n\`\`\``;
+            }).join('\n\n');
             fullContent += resultsText;
             messages = [...messages, {
                 role: 'assistant',

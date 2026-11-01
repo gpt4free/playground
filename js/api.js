@@ -630,9 +630,57 @@ const API = (() => {
     return accumulator;
   }
 
+  function contentBlockToText(block) {
+    if (block === null || block === undefined) return '';
+    if (typeof block === 'string') return block;
+    if (typeof block !== 'object') return String(block);
+    if (block.type === 'text') {
+      return typeof block.text === 'string' ? block.text : JSON.stringify(block.text ?? '');
+    }
+    if (block.type === 'resource') {
+      const resource = block.resource || {};
+      return typeof resource.text === 'string' ? resource.text : JSON.stringify(resource);
+    }
+    if (block.type === 'image') {
+      return `[image${block.mimeType ? `: ${block.mimeType}` : ''}]`;
+    }
+    return JSON.stringify(block);
+  }
+
+  function isContentBlockList(value) {
+    return Array.isArray(value) && value.every(block =>
+      block && typeof block === 'object' && typeof block.type === 'string'
+    );
+  }
+
+  function normalizeToolResult(result) {
+    if (!result) return result;
+
+    let content = result.content;
+    if (isContentBlockList(content)) {
+      content = content.map(contentBlockToText).filter(text => text !== '').join('\n');
+    } else if (typeof content === 'string') {
+      // Older MCP clients serialized the CallToolResult content blocks as JSON.
+      const trimmed = content.trim();
+      if (trimmed.startsWith('[')) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          if (isContentBlockList(parsed)) {
+            content = parsed.map(contentBlockToText).filter(text => text !== '').join('\n');
+          }
+        } catch {}
+      }
+    }
+
+    return { ...result, content };
+  }
+
   async function executeToolCalls(toolCalls) {
     if (!toolCalls || toolCalls.length === 0) return [];
-    return getMCPClient().executeToolCalls(toolCalls.map(normalizeToolCall).filter(Boolean));
+    const client = getMCPClient();
+    if (!client) throw new Error('MCP client is not available');
+    const results = await client.executeToolCalls(toolCalls.map(normalizeToolCall).filter(Boolean));
+    return (results || []).map(normalizeToolResult);
   }
 
   function filterMessages(messages) {
