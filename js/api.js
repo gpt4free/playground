@@ -1062,8 +1062,7 @@ const API = (() => {
     return data.choices?.[0]?.message?.content || '';
   }
 
-  function extractThinkingFromText(text) {
-    const patterns = [
+  function extractThinkingFromText(text) {    const patterns = [
       { open: '<think>', close: '</think>' },
       { open: '<thinking>', close: '</thinking>' },
       { open: '<thought>', close: '</thought>' },
@@ -1092,9 +1091,103 @@ const API = (() => {
     return { thinking, content };
   }
 
+  // ---------------------------------------------------------------------
+  // Browsing / live feeds / triggers / notifications
+  // ---------------------------------------------------------------------
+
+  function getBrowsingBase() {
+    const explicit = localStorage.getItem('g4f_browsing_base');
+    if (explicit) return explicit.replace(/\/+$/, '');
+    const host = location.hostname;
+    if (host === 'localhost' || host === '127.0.0.1' || host.endsWith('.g4f.local')) {
+      return location.origin;
+    }
+    return 'https://g4f.space';
+  }
+
+  async function browsingRequest(path, options = {}) {
+    const url = `${getBrowsingBase()}${path.startsWith('/') ? path : `/${path}`}`;
+    const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
+    const token = localStorage.getItem('g4f_session');
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const res = await fetch(url, { ...options, headers });
+    if (!res.ok) {
+      let detail = '';
+      try {
+        const body = await res.json();
+        detail = body?.error?.message || body?.detail || JSON.stringify(body);
+      } catch {
+        detail = await res.text().catch(() => '');
+      }
+      throw new Error(`Browsing API ${res.status}${detail ? `: ${detail}` : ''}`);
+    }
+    return res.json();
+  }
+
+  async function getFeed(url, limit = 50, conversationId = null) {
+    const params = new URLSearchParams({ url, limit: String(limit) });
+    if (conversationId) params.set('conversation_id', conversationId);
+    return browsingRequest(`/v1/browsing/feeds?${params.toString()}`);
+  }
+
+  async function searchBrowsing(query, apis = [], limit = 10) {
+    return browsingRequest('/v1/browsing/search', {
+      method: 'POST',
+      body: JSON.stringify({ query, apis, limit }),
+    });
+  }
+
+  async function browseUrls(urls, options = {}) {
+    return browsingRequest('/v1/browsing/browse', {
+      method: 'POST',
+      body: JSON.stringify({ urls: Array.isArray(urls) ? urls : [urls], ...options }),
+    });
+  }
+
+  async function listBrowsingApis(params = {}) {
+    const query = new URLSearchParams(params).toString();
+    return browsingRequest(`/v1/browsing/apis${query ? `?${query}` : ''}`);
+  }
+
+  async function createTriggerFromPrompt(prompt, source = null, save = true) {
+    return browsingRequest('/v1/browsing/triggers/from-prompt', {
+      method: 'POST',
+      body: JSON.stringify({ prompt, source, save }),
+    });
+  }
+
+  async function runDueTriggers() {
+    return browsingRequest('/v1/browsing/triggers/run-due', { method: 'POST', body: '{}' });
+  }
+
+  async function getNotifications(unreadOnly = true, limit = 50) {
+    const params = new URLSearchParams({
+      unread_only: String(unreadOnly),
+      limit: String(limit),
+    });
+    return browsingRequest(`/v1/browsing/notifications?${params.toString()}`);
+  }
+
+  async function markNotificationsRead(id = null) {
+    return browsingRequest('/v1/browsing/notifications/read', {
+      method: 'POST',
+      body: JSON.stringify(id ? { id } : {}),
+    });
+  }
+
+  async function notifyFinished(payload) {
+    return browsingRequest('/v1/browsing/notifications', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
   return {
     fetchModels, streamChat, chat, detectEndpointType, extractThinkingFromText,
     executeToolCalls, mergeToolCalls, normalizeToolCall, getMCPClient, getSelectedMCPToolsForAPI,
     generateImage, isImageModel, classifyModels, checkProvider, ENDPOINT_TYPES,
+    getBrowsingBase, getFeed, searchBrowsing, browseUrls, listBrowsingApis,
+    createTriggerFromPrompt, runDueTriggers, getNotifications, markNotificationsRead,
+    notifyFinished,
   };
 })();

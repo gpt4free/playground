@@ -3,6 +3,8 @@ const ChatPage = (() => {
   let currentModel = null;
   let isStreaming = false;
   let abortController = null;
+  let feedTimer = null;
+  const notifiedIds = new Set();
 
   function render(container) {
     Components.injectStyles();
@@ -23,6 +25,10 @@ const ChatPage = (() => {
     layout.appendChild(sidebar);
     layout.appendChild(main);
     container.appendChild(layout);
+
+    startFeedRefresh();
+    API.runDueTriggers().catch(() => {});
+    refreshServerNotifications();
 
     Store.getLastChat().then(lastChat => {
       const importChatId = localStorage.getItem('openChatId');
@@ -58,11 +64,23 @@ const ChatPage = (() => {
     sidebar.innerHTML = `
       <div class="sidebar-header">
         <h3>Chats</h3>
-        <button class="btn btn-primary btn-sm" id="new-chat-btn">+ New</button>
+        <div style="display:flex;gap:6px;align-items:center">
+          <button class="btn btn-secondary btn-sm" id="new-feed-btn" title="Add a live RSS/Atom feed">＋ Feed</button>
+          <button class="btn btn-secondary btn-sm" id="new-trigger-btn" title="Create a trigger from a prompt">⚡</button>
+          <button class="btn btn-primary btn-sm" id="new-chat-btn">+ New</button>
+        </div>
       </div>
       <div class="sidebar-list" id="chat-list"></div>`;
     sidebar.querySelector('#new-chat-btn').addEventListener('click', () => {
       newChat();
+      closeSidebar();
+    });
+    sidebar.querySelector('#new-feed-btn').addEventListener('click', () => {
+      addFeed();
+      closeSidebar();
+    });
+    sidebar.querySelector('#new-trigger-btn').addEventListener('click', () => {
+      addTriggerFromPrompt();
       closeSidebar();
     });
     refreshSidebar(sidebar);
@@ -74,7 +92,7 @@ const ChatPage = (() => {
     if (!list) return;
     list.innerHTML = '';
     Store.getChats().then(chats => {
-      const chatList = chats.filter(c => c.type === 'chat');
+      const chatList = chats.filter(c => c.type === 'chat' || c.type === 'feed');
       if (chatList.length === 0) {
         list.innerHTML = '<div style="padding:16px;color:var(--text2);font-size:13px">No chats yet</div>';
         return;
@@ -83,10 +101,15 @@ const ChatPage = (() => {
         const item = document.createElement('div');
         item.className = 'sidebar-item' + (chat.id === currentChatId ? ' active' : '');
         item.dataset.id = chat.id;
+        const isFeed = chat.type === 'feed';
+        const sub = isFeed
+          ? `📡 Live feed · ${chat.count || 0} ${Components.escHtml(framework.translate('messages'))}`
+          : `${chat.count} ${Components.escHtml(framework.translate('messages'))}`;
+        const unread = chat.feedUnread ? `<span class="badge" style="margin-left:6px">${chat.feedUnread}</span>` : '';
         item.innerHTML = `
           <div style="flex:1;min-width:0">
-            <div class="item-title">${Components.escHtml(chat.title || 'Untitled')}</div>
-            <div class="item-sub">${chat.count} ${Components.escHtml(framework.translate('messages'))}</div>
+            <div class="item-title">${isFeed ? '📡 ' : ''}${Components.escHtml(chat.title || 'Untitled')}${unread}</div>
+            <div class="item-sub">${sub}</div>
           </div>
           <button class="item-del" title="Delete">✕</button>`;
         item.addEventListener('click', e => {
@@ -151,6 +174,29 @@ const ChatPage = (() => {
     qrBtn.textContent = 'QR';
     qrBtn.addEventListener('click', () => generateChatQRCode());
 
+    const notifyBtn = document.createElement('button');
+    notifyBtn.className = 'btn btn-secondary btn-sm';
+    notifyBtn.id = 'chat-notify-btn';
+    const paintNotifyBtn = () => {
+      notifyBtn.textContent = (typeof Notifier !== 'undefined' && Notifier.isEnabled()) ? '🔔' : '🔕';
+      notifyBtn.title = notifyBtn.textContent === '🔔'
+        ? 'Notifications are on'
+        : 'Enable notifications for finished messages';
+    };
+    notifyBtn.addEventListener('click', async () => {
+      if (typeof Notifier === 'undefined') {
+        Components.toast('Notifications are not supported here', 'error');
+        return;
+      }
+      const enabled = await Notifier.toggle();
+      paintNotifyBtn();
+      Components.toast(
+        enabled ? 'Notifications enabled' : 'Notifications disabled',
+        enabled ? 'success' : 'info'
+      );
+    });
+    paintNotifyBtn();
+
     toolbar.appendChild(sidebarBtn);
     toolbar.appendChild(titleInput);
     toolbar.appendChild(modelSel);
@@ -158,6 +204,7 @@ const ChatPage = (() => {
     toolbar.appendChild(saveBtn);
     toolbar.appendChild(playBtn);
     toolbar.appendChild(qrBtn);
+    toolbar.appendChild(notifyBtn);
 
     const messagesWrap = document.createElement('div');
     messagesWrap.className = 'messages-wrap';
@@ -185,6 +232,10 @@ const ChatPage = (() => {
     Store.getChat(id).then(chat => {
       console.log('Loaded chat:', chat);
       if (!chat) return;
+      if (chat.type === 'feed' && chat.feedUnread) {
+        chat.feedUnread = 0;
+        Store.upsertChat(chat);
+      }
       const sendBtn = document.querySelector('.input-bar .send-btn');
       if (sendBtn) {
         if (!chat.items.some(m => m.role === 'user')) {
@@ -271,6 +322,7 @@ const ChatPage = (() => {
 
     let typingRemoved = false;
     let collectedToolCalls = {};
+    let wasAborted = false;
 
     try {
       let fullContent = '';
@@ -375,6 +427,8 @@ const ChatPage = (() => {
         assistantMsg.content = `**${framework.translate('Error')}**: ${err.message}`;
         contentEl.innerHTML = Components.renderMarkdown(assistantMsg.content);
         Components.toast(err.message, 'error');
+      } else {
+        wasAborted = true;
       }
     }
 
@@ -395,9 +449,172 @@ const ChatPage = (() => {
     Store.upsertChat(chat);
     refreshSidebar();
 
+    if (!assistantMsg.error && !wasAborted) {
+      if (typeof Notifier !== 'undefined') {
+        Notifier.onMessageDone({
+          chatId: chat.id,
+          title: chat.title,
+          preview: (assistantMsg.content || '').replace(/[#*_`>]/g, '').slice(0, 160),
+        });
+      }
+      if (document.hidden) {
+        API.notifyFinished({
+          title: chat.title || 'Chat finished',
+          body: (assistantMsg.content || '').replace(/[#*_`>]/g, '').slice(0, 200),
+          kind: 'chat',
+          source: chat.id,
+        }).catch(() => {});
+      }
+    }
+
     isStreaming = false;
     abortController = null;
     inputBar?.setStreaming(false);
+  }
+
+  async function addFeed() {
+    const raw = window.prompt('RSS or Atom feed URL (e.g. https://news.ycombinator.com/rss):');
+    if (!raw) return;
+    const url = raw.trim();
+    if (!/^https?:\/\//i.test(url)) {
+      Components.toast('Please enter an http(s) URL', 'error');
+      return;
+    }
+    try {
+      Components.toast('Loading feed...', 'info');
+      const incoming = await API.getFeed(url, 50);
+      const chats = await Store.getChats();
+      const existing = chats.find(c => c.type === 'feed' && c.feedUrl === incoming.feedUrl);
+      const id = existing ? existing.id : Store.newId();
+      const previous = existing ? await Store.getChat(existing.id) : null;
+      const seen = new Set(previous?.feedSeen || []);
+      const items = previous
+        ? [...(previous.items || []), ...incoming.items.filter(item => !seen.has(item.id))]
+        : incoming.items;
+      const chat = {
+        ...(previous || {}),
+        ...incoming,
+        id,
+        type: 'feed',
+        items,
+        feedSeen: Array.from(new Set([...(previous?.feedSeen || []), ...(incoming.feedSeen || [])])).slice(-500),
+        feedUnread: 0,
+        added: previous?.added || Date.now(),
+        updated: Date.now(),
+      };
+      await Store.upsertChat(chat);
+      loadChat(id);
+      refreshSidebar();
+      Components.toast(`Live feed added: ${incoming.title || url}`, 'success');
+    } catch (err) {
+      Components.toast(`Could not load feed: ${err.message}`, 'error');
+    }
+  }
+
+  async function addTriggerFromPrompt() {
+    const prompt = window.prompt(
+      'Describe a trigger. Example: Notify me when the "AI" RSS feed mentions OpenAI every 10 minutes'
+    );
+    if (!prompt) return;
+    try {
+      const trigger = await API.createTriggerFromPrompt(prompt, null, true);
+      Components.toast(`Trigger created: ${trigger.name}`, 'success');
+    } catch (err) {
+      Components.toast(`Could not create trigger: ${err.message}`, 'error');
+    }
+  }
+
+  async function refreshFeeds() {
+    let chats;
+    try {
+      chats = (await Store.getChats()).filter(c => c.type === 'feed' && c.feedUrl);
+    } catch {
+      return;
+    }
+    for (const summary of chats) {
+      let chat;
+      try {
+        chat = await Store.getChat(summary.id);
+      } catch {
+        continue;
+      }
+      if (!chat || !chat.feedUrl) continue;
+      try {
+        const incoming = await API.getFeed(chat.feedUrl, 50, chat.id);
+        const seen = new Set(chat.feedSeen || []);
+        const fresh = (incoming.items || []).filter(item => item.id && !seen.has(item.id));
+        if (fresh.length === 0) continue;
+        chat.items = [...(chat.items || []), ...fresh];
+        chat.feedSeen = Array.from(new Set([...(chat.feedSeen || []), ...fresh.map(item => item.id)])).slice(-500);
+        chat.feedUnread = (chat.feedUnread || 0) + fresh.length;
+        chat.title = incoming.title || chat.title;
+        if (chat.id === currentChatId) {
+          chat.feedUnread = 0;
+          renderMessages(chat.items);
+        } else if (typeof Notifier !== 'undefined') {
+          Notifier.onFeedUpdate({
+            chatId: chat.id,
+            title: chat.title,
+            count: fresh.length,
+            preview: (fresh[fresh.length - 1].content || '').replace(/[#*_`>]/g, '').slice(0, 160),
+          });
+        }
+        await Store.upsertChat(chat);
+      } catch (err) {
+        console.warn('Feed refresh failed:', chat.feedUrl, err);
+      }
+    }
+    refreshSidebar();
+  }
+
+  let feedVisibilityBound = false;
+  function startFeedRefresh() {
+    if (feedTimer) clearInterval(feedTimer);
+    feedTimer = setInterval(() => {
+      if (document.hidden) return;
+      API.runDueTriggers().catch(() => {});
+      refreshFeeds();
+      refreshServerNotifications();
+    }, 5 * 60 * 1000);
+    if (!feedVisibilityBound) {
+      feedVisibilityBound = true;
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) {
+          API.runDueTriggers().catch(() => {});
+          refreshFeeds();
+          refreshServerNotifications();
+        }
+      });
+    }
+  }
+
+  async function refreshServerNotifications() {
+    try {
+      const result = await API.getNotifications(true, 20);
+      const items = result.data || [];
+      let shown = 0;
+      for (const item of items) {
+        if (!item.id || notifiedIds.has(item.id)) continue;
+        notifiedIds.add(item.id);
+        shown += 1;
+        if (typeof Notifier !== 'undefined') {
+          const displayed = Notifier.notify(item.title, item.body, {
+            tag: `g4f-${item.id}`,
+            url: item.url,
+            chatId: item.metadata?.chat_id,
+          });
+          if (!displayed && document.hidden === false && item.kind === 'trigger') {
+            Components.toast(`${item.title}${item.body ? ` — ${item.body.slice(0, 80)}` : ''}`, 'info');
+          }
+        }
+      }
+      if (shown > 0) {
+        if (document.hidden && typeof Notifier !== 'undefined') Notifier.bumpUnread(shown);
+        await API.markNotificationsRead();
+      }
+    } catch (err) {
+      console.debug('Notification refresh skipped:', err.message);
+    }
   }
 
   function deleteMessage(msgId) {
@@ -563,5 +780,5 @@ const ChatPage = (() => {
     }
   }
 
-  return { render };
+  return { render, open: loadChat, addFeed, addTriggerFromPrompt, refreshFeeds };
 })();
